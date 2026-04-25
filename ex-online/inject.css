@@ -1,0 +1,8 @@
+/* Smooth transition for the page content when sidebar opens/closes */
+body {
+    transition: width 0.3s ease, margin-right 0.3s ease !important;
+}
+
+#audit-sidebar-container {
+    transition: transform 0.3s ease !important;
+}

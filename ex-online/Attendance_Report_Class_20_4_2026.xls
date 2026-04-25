@@ -1,0 +1,18 @@
+
+      <table border="1">
+        <tr style="background-color: #00558d; color: white; font-weight: bold;">
+          <th>S.No</th>
+          <th>Participant Name</th>
+          <th>First Seen At</th>
+          <th>Attended Duration</th>
+          <th>Attended Percentage</th>
+        </tr>
+    
+        <tr>
+          <td>1</td>
+          <td>Nguyễn Vĩnh Phúc(Bạn) cuộc họpdevicesmore_vertThao tác khác</td>
+          <td>17:37:14</td>
+          <td>1 min 0s</td>
+          <td>96%</td>
+        </tr>
+      </table>

@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Giám sát Lớp học Online - Sidebar",
+  "version": "1.1",
+  "description": "Sidebar tích hợp trực tiếp vào trang cuộc họp để giám sát lớp học.",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:;"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://meet.google.com/*", "*://*.zoom.us/*"],
+      "js": ["content.js"],
+      "css": ["inject.css"]
+    }
+  ],
+  "action": {},
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "style.css", "popup.js", "logo.png"],
+      "matches": ["*://meet.google.com/*", "*://*.zoom.us/*"]
+    }
+  ]
+}

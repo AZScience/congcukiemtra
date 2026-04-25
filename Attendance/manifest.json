@@ -1,0 +1,25 @@
+{
+"update_url": "https://clients2.google.com/service/update2/crx",
+
+    "name":"Meet Attendance Tracker – for Google Meet",
+    "description":"The most accurate and reliable chrome extension to track attendance in Google Meet with just a single click !",
+    "version":"3.0",
+    "manifest_version":3,
+    "content_scripts":[
+      {
+        "matches":[
+          "https://meet.google.com/*"
+        ],
+        "js":["content.js"]
+      }
+    ],
+      "action": {
+        "default_icon": "images/logo32.png",
+        "default_popup": "popup.html"
+      },
+      "icons": { 
+        "16": "images/logo16.png",
+        "48": "images/logo48.png",
+       "128": "images/logo128.png" 
+      }
+}

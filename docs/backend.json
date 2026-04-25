@@ -1,0 +1,427 @@
+
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Schema for a student record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Student ID (MSSV)" },
+        "name": { "type": "string", "description": "Full Name" },
+        "avatarUrl": { "type": "string", "format": "uri", "description": "Avatar URL" },
+        "gender": { "type": "string", "enum": ["Nam", "Nữ"] },
+        "birthDate": { "type": "string", "description": "Date of Birth (dd/MM/yyyy)" },
+        "birthPlace": { "type": "string" },
+        "hometown": { "type": "string" },
+        "ethnicity": { "type": "string" },
+        "religion": { "type": "string" },
+        "permanentAddress": { "type": "string" },
+        "temporaryAddress": { "type": "string" },
+        "citizenId": { "type": "string" },
+        "class": { "type": "string" },
+        "major": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "fatherOccupation": { "type": "string" },
+        "motherName": { "type": "string" },
+        "motherOccupation": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "name", "gender", "birthDate", "class", "major", "phone", "email"]
+    },
+    "Lecturer": {
+      "title": "Lecturer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "department": { "type": "string" },
+        "position": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "note": { "type": "string" },
+        "avatarUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["id", "name"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Internal UID" },
+        "employeeId": { "type": "string", "description": "Business Employee ID" },
+        "name": { "type": "string" },
+        "nickname": { "type": "string" },
+        "position": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "note": { "type": "string" },
+        "avatarUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["id", "employeeId", "name", "email", "role"]
+    },
+    "Department": {
+      "title": "Department",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "name": { "type": "string" },
+        "head": { "type": "string" },
+        "deputyHead": { "type": "string" },
+        "secretary": { "type": "string" },
+        "spokesperson": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "departmentId", "name"]
+    },
+    "Role": {
+      "title": "Role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" },
+        "permissions": { "type": "object" }
+      },
+      "required": ["id", "name"]
+    },
+    "Position": {
+      "title": "Position",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Gift": {
+      "title": "Gift",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "BuildingBlock": {
+      "title": "Building Block",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "isInactive": { "type": "boolean" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "code", "name"]
+    },
+    "Classroom": {
+      "title": "Classroom",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "buildingBlockId": { "type": "string" },
+        "seatingCapacity": { "type": ["number", "null"] },
+        "tableCount": { "type": ["number", "null"] },
+        "examCapacity": { "type": ["number", "null"] },
+        "roomType": { "type": "string" },
+        "subjectNature": { "type": "string" },
+        "hasProjector": { "type": "boolean" },
+        "isInactive": { "type": "boolean" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "name", "buildingBlockId"]
+    },
+    "Recognition": {
+      "title": "Recognition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "IncidentCategory": {
+      "title": "Incident Category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recognitionId": { "type": "string" },
+        "name": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "required": ["id", "recognitionId", "name"]
+    },
+    "Petition": {
+        "title": "Petition",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "receptionDate": { "type": "string" },
+            "buildingBlock": { "type": "string" },
+            "recipient": { "type": "string" },
+            "citizenName": { "type": "string", "description": "Họ và tên công dân" },
+            "citizenId": { "type": "string", "description": "MSSV/CCCD" },
+            "citizenAddress": { "type": "string", "description": "Địa chỉ" },
+            "citizenPhone": { "type": "string", "description": "Điện thoại" },
+            "summary": { "type": "string" },
+            "petitionType": { "type": "string", "enum": ["Khiếu nại", "Tố cáo", "Kiến nghị", "Phản ánh"] },
+            "numberOfPeople": { "type": ["number", "null"] },
+            "previousAuthority": { "type": "string" },
+            "isAccepted": { "type": "boolean" },
+            "isReturned": { "type": "boolean" },
+            "isForwarded": { "type": "boolean" },
+            "resolutionFollowUp": { "type": "string" },
+            "note": { "type": "string" }
+        },
+        "required": ["id", "receptionDate", "recipient", "citizenName", "summary"]
+    },
+    "Request": {
+        "title": "Request",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "buildingBlock": { "type": "string" },
+            "studentName": { "type": "string" },
+            "studentId": { "type": "string" },
+            "class": { "type": "string" },
+            "department": { "type": "string" },
+            "phone": { "type": "string" },
+            "content": { "type": "string" },
+            "attachments": { "type": "string" },
+            "requestDate": { "type": "string" },
+            "requesterName": { "type": "string" },
+            "receptionDate": { "type": "string" },
+            "recipient": { "type": "string" },
+            "isProcessedImmediately": { "type": "boolean" },
+            "appointmentDate": { "type": "string" },
+            "otherNote": { "type": "string" },
+            "resolutionDate": { "type": "string" },
+            "resolverName": { "type": "string" },
+            "feedback": { "type": "string" }
+        },
+        "required": ["id", "studentName", "studentId", "content", "receptionDate", "recipient"]
+    },
+    "AssetReception": {
+        "title": "Asset Reception",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "entryNumber": { "type": "string" },
+            "receptionDate": { "type": "string" },
+            "buildingBlock": { "type": "string" },
+            "giverName": { "type": "string" },
+            "giverId": { "type": "string" },
+            "content": { "type": "string" },
+            "returnStatus": { "type": "string", "enum": ["Đã trả", "Chưa trả", "Đã xử lý"] }
+        },
+        "required": ["id", "entryNumber", "receptionDate", "giverName", "content", "returnStatus"]
+    },
+    "AssetGratitude": {
+        "title": "Asset Gratitude",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "entryNumber": { "type": "string" },
+            "location": { "type": "string" },
+            "receiverName": { "type": "string" },
+            "receptionDate": { "type": "string" },
+            "giveawayDate": { "type": "string" },
+            "gift": { "type": "string" }
+        },
+        "required": ["id", "entryNumber", "receiverName", "receptionDate"]
+    },
+    "DailySchedule": {
+        "title": "Daily Schedule",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "date": { "type": "string", "description": "Ngày" },
+            "building": { "type": "string", "description": "Dãy nhà" },
+            "room": { "type": "string", "description": "Phòng" },
+            "period": { "type": "string", "description": "Tiết" },
+            "type": { "type": "string", "enum": ["LT", "TH", ""], "description": "LT/TH" },
+            "department": { "type": "string", "description": "Khoa sử dụng" },
+            "class": { "type": "string", "description": "Lớp" },
+            "studentCount": { "type": ["number", "null"], "description": "Sĩ số" },
+            "lecturer": { "type": "string", "description": "Giảng viên" },
+            "content": { "type": "string", "description": "Nội dung" },
+            "status": { "type": "string", "description": "Trạng thái" },
+            "time": { "type": "string", "description": "Thời gian" },
+            "proctor1": { "type": "string", "description": "Cán bộ coi thi 1" },
+            "proctor2": { "type": "string", "description": "Cán bộ coi thi 2" },
+            "proctor3": { "type": "string", "description": "Cán bộ coi thi 3" },
+            "note": { "type": "string", "description": "Ghi chú" }
+        },
+        "required": ["id", "date", "room", "period", "lecturer"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Log of user activities in the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "action": { "type": "string", "enum": ["login", "logout", "view", "create", "update", "delete", "import", "export"] },
+        "targetType": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userId", "action"]
+    },
+    "Message": {
+        "title": "Message",
+        "description": "A message sent between users.",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "senderId": { "type": "string" },
+            "recipientIds": { "type": "array", "items": { "type": "string" } },
+            "subject": { "type": "string" },
+            "body": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "attachments": { "type": "array", "items": { "type": "string", "format": "uri" } },
+            "isRead": { "type": "boolean" }
+        },
+        "required": ["id", "senderId", "recipientIds", "subject", "body", "timestamp"]
+    },
+    "Engagement": {
+      "title": "Engagement",
+      "description": "Visitor and engagement statistics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dailyVisitors": { "type": "number" },
+        "weeklyVisitors": { "type": "number" },
+        "monthlyVisitors": { "type": "number" },
+        "onlineUsers": { "type": "number" }
+      },
+      "required": ["id"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User specific application settings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "notifications": { 
+          "type": "object",
+          "properties": {
+            "messageNotifications": { "type": "boolean" },
+            "birthdayNotifications": { "type": "boolean" },
+            "birthdayMessageAction": { "type": "string", "enum": ["auto", "manual", "none"] },
+            "birthdayMessageTemplate": { "type": "string" }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "properties": {
+            "showPhone": { "type": "boolean" },
+            "showAddress": { "type": "boolean" },
+            "showBirthDate": { "type": "boolean" }
+          }
+        }
+      },
+      "required": ["id"]
+    }
+  },
+  "auth": {
+    "providers": ["email"]
+  },
+  "firestore": {
+    "/students": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Collection of student records."
+    },
+    "/lecturers": {
+      "schema": { "$ref": "#/entities/Lecturer" },
+      "description": "Collection of lecturer records."
+    },
+    "/employees": {
+      "schema": { "$ref": "#/entities/Employee" },
+      "description": "Collection of employee records."
+    },
+    "/departments": {
+        "schema": { "$ref": "#/entities/Department" },
+        "description": "List of all departments"
+    },
+    "/roles": {
+        "schema": { "$ref": "#/entities/Role" },
+        "description": "User roles and permissions"
+    },
+    "/positions": {
+        "schema": { "$ref": "#/entities/Position" },
+        "description": "List of job positions"
+    },
+    "/gifts": {
+        "schema": { "$ref": "#/entities/Gift" },
+        "description": "List of gifts for recognitions"
+    },
+    "/building-blocks": {
+        "schema": { "$ref": "#/entities/BuildingBlock" },
+        "description": "List of building blocks/areas"
+    },
+    "/classrooms": {
+        "schema": { "$ref": "#/entities/Classroom" },
+        "description": "List of all classrooms"
+    },
+    "/recognitions": {
+        "schema": { "$ref": "#/entities/Recognition" },
+        "description": "List of recognition types"
+    },
+    "/incident-categories": {
+        "schema": { "$ref": "#/entities/IncidentCategory" },
+        "description": "List of incident categories"
+    },
+     "/petitions": {
+        "schema": { "$ref": "#/entities/Petition" },
+        "description": "Collection of petitions"
+    },
+    "/requests": {
+        "schema": { "$ref": "#/entities/Request" },
+        "description": "Collection of student/staff requests"
+    },
+    "/asset-receptions": {
+        "schema": { "$ref": "#/entities/AssetReception" },
+        "description": "Log of received assets"
+    },
+    "/asset-gratitudes": {
+        "schema": { "$ref": "#/entities/AssetGratitude" },
+        "description": "Log of good deeds / gratitudes"
+    },
+    "/schedules": {
+        "schema": { "$ref": "#/entities/DailySchedule" },
+        "description": "Daily class schedules"
+    },
+    "/activity-logs": {
+        "schema": { "$ref": "#/entities/ActivityLog" },
+        "description": "Collection of user activity logs."
+    },
+    "/messages": {
+        "schema": { "$ref": "#/entities/Message" },
+        "description": "Collection of messages."
+    },
+    "/engagement": {
+      "schema": { "$ref": "#/entities/Engagement" },
+      "description": "Collection of engagement stats."
+    },
+    "/user-settings/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User-specific settings."
+    }
+  }
+}

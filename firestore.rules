@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- 1. Public Access Collections (Read-only for reference data) ---
+    match /system_settings/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    match /recognitions/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /incident-categories/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /schedules/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /building-blocks/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /departments/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /classrooms/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    match /gifts/{docId} { allow read: if true; allow write: if isAuthenticated(); }
+    
+    // --- 2. Public Access Collections (Write/Create for tracking) ---
+    match /visits/{docId} { 
+      allow read, write: if true; 
+    }
+    
+    match /online_checkins/{docId} {
+      allow read, write: if true;
+    }
+    
+    match /external_checkins/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isAuthenticated();
+    }
+    
+    match /activity-logs/{docId} { 
+      allow create: if true; 
+      allow read, update, delete: if isAuthenticated(); 
+    }
+    
+    match /online_presence/{userId} { 
+      allow read: if isAuthenticated();
+      allow write: if true; // Allow marking presence for all (will be limited by AuthGuard in UI but good for reliability)
+    }
+
+    // --- 3. Secure User-Specific Data ---
+    match /employees/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /user_settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid || 
+        request.auth.uid in resource.data.recipientIds
+      );
+      allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid || 
+        request.auth.uid in resource.data.recipientIds
+      );
+    }
+
+    // --- 4. General Authenticated Access (Catch-all for internal modules) ---
+    match /roles/{docId} { allow read, write: if isAuthenticated(); }
+    match /positions/{docId} { allow read, write: if isAuthenticated(); }
+    match /lecturers/{docId} { allow read, write: if isAuthenticated(); }
+    match /students/{docId} { allow read, write: if isAuthenticated(); }
+    match /student-violations/{docId} { allow read, write: if isAuthenticated(); }
+    match /good-deeds/{docId} { allow read, write: if isAuthenticated(); }
+    match /petitions/{docId} { allow read, write: if isAuthenticated(); }
+    match /requests/{docId} { allow read, write: if isAuthenticated(); }
+    match /asset-receptions/{docId} { allow read, write: if isAuthenticated(); }
+    match /asset-gratitudes/{docId} { allow read, write: if isAuthenticated(); }
+    match /engagement/{docId} { allow read, write: if isAuthenticated(); }
+
+    // Fallback for any newly created collections
+    match /{path=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
