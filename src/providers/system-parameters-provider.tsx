@@ -26,6 +26,13 @@ interface SystemParameters {
     aiModel: string;
     aiSystemPrompt: string;
     aiTemperature: number;
+    loginImageUrl: string;
+    loginQuote: string;
+    loginQuoteAuthor: string;
+    feedbackSheetId: string;
+    feedbackTabName: string;
+    evidenceServiceAccountEmail: string;
+    evidencePrivateKey: string;
 }
 
 const DEFAULT_PARAMS: SystemParameters = {
@@ -37,6 +44,10 @@ const DEFAULT_PARAMS: SystemParameters = {
     googleDriveFolderId: "",
     faqSheetTabName: "Hỏi đáp",
     reportSheetTabName: "Báo cáo Tổng hợp",
+    feedbackSheetId: "",
+    feedbackTabName: "Trang tính1",
+    evidenceServiceAccountEmail: "",
+    evidencePrivateKey: "",
     adminEmail: "vinhphuc@ntt.edu.vn",
     supportPhone: "0987654321",
     website: "https://kiemtranoibo.ntt.edu.vn",
@@ -49,7 +60,12 @@ const DEFAULT_PARAMS: SystemParameters = {
     aiApiKey: "",
     aiModel: "gemini-1.5-pro",
     aiSystemPrompt: "Bạn là một trợ lý AI chuyên nghiệp hỗ trợ công tác kiểm tra nội bộ tại trường Đại học Nguyễn Tất Thành. Hãy trả lời ngắn gọn, chính xác và chuyên nghiệp.",
-    aiTemperature: 0.7
+    aiTemperature: 0.7,
+    loginImageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmd8ZW58MHx8fHwxNzIxOTU4OTg5fDA&ixlib=rb-4.0.3&q=80&w=1080",
+    loginQuote: "Công nghệ chỉ là một công cụ. Về mặt khích lệ bọn trẻ làm việc cùng nhau và động viên chúng, giáo viên là người quan trọng nhất.",
+    loginQuoteAuthor: "Bill Gates",
+    feedbackSheetId: "",
+    feedbackTabName: "Biểu mẫu 1"
 };
 
 interface SystemParametersContextType {

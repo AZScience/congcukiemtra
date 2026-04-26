@@ -297,10 +297,10 @@ export default function ExternalCheckinsPage() {
                                                 <ColumnHeader columnKey={key} title={columnDefs[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={requestSort} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={handleFilterChange} icon={colIcons[key]} />
                                             </TableHead>
                                         ))}
-                                        <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400">
+                                        <TableHead className="w-16 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400 p-0 text-center">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700">
+                                                    <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors">
                                                         <Cog className="h-5 w-5" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -369,7 +369,7 @@ export default function ExternalCheckinsPage() {
                                                     return <TableCell key={key} className="border-r border-slate-200">{(item as any)[key]}</TableCell>;
                                                 })}
 
-                                                <TableCell className="text-center p-2">
+                                                <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center p-2">
                                                     <TooltipProvider>
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>

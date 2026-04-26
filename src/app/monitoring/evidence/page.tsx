@@ -615,7 +615,7 @@ export default function EvidenceManagementPage() {
                                     <TableHead>Đối tượng / Nội dung</TableHead>
                                     <TableHead className="w-[150px]">Người cập nhật</TableHead>
                                     <TableHead className="w-[120px]">Ngày</TableHead>
-                                    <TableHead className="w-[120px] text-right">Tác vụ</TableHead>
+                                    <TableHead className="w-[120px] text-right sticky right-0 z-20 bg-slate-50 shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400">Tác vụ</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -662,7 +662,7 @@ export default function EvidenceManagementPage() {
                                         </TableCell>
                                         <TableCell className="text-xs font-medium text-slate-600">{item.submittedByName}</TableCell>
                                         <TableCell className="text-xs text-slate-500">{item.dateStr}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right sticky right-0 z-10 bg-white group-hover:bg-blue-50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100">
                                                     <Eye className="h-4 w-4" />

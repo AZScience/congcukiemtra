@@ -13,7 +13,7 @@ export async function verifyAIConnection(apiKey: string, model: string): Promise
         const genAI = new GoogleGenerativeAI(key);
         
         const requestedModel = (model || "gemini-1.5-flash").trim().replace(/^models\//, "");
-        const fallbackModels = ["gemini-1.5-flash", "gemini-2.0-flash"];
+        const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"];
         const modelQueue = Array.from(new Set([requestedModel, ...fallbackModels]));
 
         let lastError = "";
@@ -40,6 +40,8 @@ export async function verifyAIConnection(apiKey: string, model: string): Promise
         let msg = lastError;
         if (msg.includes("429") || msg.includes("quota")) {
             msg = "Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút hoặc đổi sang API Key khác.";
+        } else if (msg.includes("payment") || msg.includes("funds") || msg.includes("OR_FGVEM_40")) {
+            msg = "Lỗi thanh toán/hết số dư (OR_FGVEM_40). Vui lòng kiểm tra Billing trên Google Cloud.";
         }
         return { success: false, message: `Lỗi kết nối: ${msg}` };
     } catch (e: any) {
@@ -47,6 +49,8 @@ export async function verifyAIConnection(apiKey: string, model: string): Promise
         let msg = e.message;
         if (msg.includes("429") || msg.includes("quota")) {
             msg = "Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút hoặc đổi sang model gemini-1.5-flash.";
+        } else if (msg.includes("payment") || msg.includes("funds") || msg.includes("OR_FGVEM_40")) {
+            msg = "Lỗi thanh toán Google Cloud (OR_FGVEM_40).";
         }
         return { success: false, message: `Lỗi kết nối: ${msg}` };
     }

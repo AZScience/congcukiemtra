@@ -903,20 +903,43 @@ export default function StudentViolationsPage() {
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
                                 <Table>
-                                    <TableHeader><TableRow className="bg-blue-600 hover:bg-blue-700"><TableHead className="w-[80px] font-bold text-base text-white text-center border-r border-blue-400">#</TableHead>{orderedColumns.map(key => (<TableHead key={key} className="text-white border-r border-blue-400 p-0 h-auto"><ColumnHeader columnKey={key} title={columnDefs[key]} icon={colIcons[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any) => setSortConfig([{key:k, direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} /></TableHead>))}<TableHead className="w-16 text-center text-white font-bold text-base"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-80 overflow-y-auto"><DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel><DropdownMenuSeparator />{allColumns.map(key => <DropdownMenuCheckboxItem key={key} checked={!!columnVisibility[key]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [key]: !!v}))}>{t(columnDefs[key])}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu></TableHead></TableRow></TableHeader>
+                                    <TableHeader>
+                                        <TableRow className="bg-blue-600 hover:bg-blue-700">
+                                            <TableHead className="w-[80px] font-bold text-base text-white text-center border-r border-blue-400">#</TableHead>
+                                            {orderedColumns.map(key => (
+                                                <TableHead key={key} className="text-white border-r border-blue-400 p-0 h-auto">
+                                                    <ColumnHeader columnKey={key} title={columnDefs[key]} icon={colIcons[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any) => setSortConfig([{key:k, direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} />
+                                                </TableHead>
+                                            ))}
+                                            <TableHead className="w-16 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-300 p-0 text-center">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors">
+                                                            <Cog className="h-5 w-5" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                                                        <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        {allColumns.map(key => <DropdownMenuCheckboxItem key={key} checked={!!columnVisibility[key]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [key]: !!v}))}>{t(columnDefs[key])}</DropdownMenuCheckboxItem>)}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
                                     <TableBody>
                                         {isViolationsLoading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Đang tải...</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => (
-                                            <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50 transition-all" onClick={() => openDialog('view', item)}>
+                                            <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50 transition-all group" onClick={() => openDialog('view', item)}>
                                                 <TableCell className="font-medium text-center border-r align-middle py-3">{startIndex + idx + 1}</TableCell>
                                                 {orderedColumns.map(key => (
                                                     <TableCell key={key} className="py-3 border-r font-medium">
                                                         {key === 'signed' ? (item.signatureBase64 ? (<img src={item.signatureBase64} alt="Sig" className="h-10 w-auto bg-white border rounded p-1 mx-auto" />) : (<Badge variant="destructive">Chưa ký</Badge>)) : (key === 'portraitPhoto' || key === 'documentPhoto') ? ((item as any)[key] ? (<div className="flex justify-center"><Popover><PopoverTrigger asChild><img src={(item as any)[key]} className="h-10 w-10 object-cover rounded-md border border-muted-foreground/20 cursor-pointer hover:scale-105 transition-transform" onClick={(e) => e.stopPropagation()} /></PopoverTrigger><PopoverContent className="w-64 p-1 border-primary/20 shadow-xl overflow-hidden rounded-xl"><img src={(item as any)[key]} className="w-full h-auto rounded-lg" /></PopoverContent></Popover></div>) : <span className="text-muted-foreground italic text-[10px]">N/A</span>) : String((item as any)[key] ?? '')}
                                                     </TableCell>
                                                 ))}
-                                                <TableCell className="text-center py-3" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell className="sticky right-0 z-10 bg-white group-hover:bg-muted/50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu modal={false}>
-                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Cập nhật</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Cập nhật</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>

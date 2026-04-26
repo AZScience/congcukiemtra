@@ -2,6 +2,14 @@
 
 import { JWT } from 'google-auth-library';
 
+function cleanPrivateKey(key: string): string {
+    if (!key) return "";
+    let cleaned = key.trim();
+    cleaned = cleaned.replace(/^"|"$/g, '');
+    cleaned = cleaned.replace(/\\n/g, '\n');
+    return cleaned;
+}
+
 export async function uploadToGoogleDrive(formData: FormData) {
     try {
         const file = formData.get('file') as File;
@@ -16,8 +24,8 @@ export async function uploadToGoogleDrive(formData: FormData) {
         // 1. Authenticate with Google Drive
         const serviceAccountAuth = new JWT({
             email: serviceAccountEmail,
-            key: privateKey.replace(/\\n/g, '\n'),
-            scopes: ['https://www.googleapis.com/auth/drive.file'],
+            key: cleanPrivateKey(privateKey),
+            scopes: ['https://www.googleapis.com/auth/drive'],
         });
 
         const { token } = await serviceAccountAuth.getAccessToken();
@@ -53,7 +61,7 @@ export async function uploadToGoogleDrive(formData: FormData) {
         ]);
 
         // 3. Upload to Google Drive
-        const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+        const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -66,11 +74,12 @@ export async function uploadToGoogleDrive(formData: FormData) {
         const uploadData = await uploadRes.json();
 
         if (!uploadRes.ok) {
-            console.error("Lỗi khi tải file lên:", uploadData);
+            console.error("Lỗi Google API:", uploadData);
             throw new Error(uploadData.error?.message || "Lỗi tải file lên Drive.");
         }
 
         const fileId = uploadData.id;
+        const finalUrl = uploadData.webViewLink || uploadData.webContentLink || `https://drive.google.com/file/d/${fileId}/view`;
 
         // 4. Set permission to "Anyone with the link can view"
         const permRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
@@ -93,7 +102,7 @@ export async function uploadToGoogleDrive(formData: FormData) {
         return {
             success: true,
             fileId: fileId,
-            url: uploadData.webViewLink
+            url: finalUrl
         };
 
     } catch (error: any) {

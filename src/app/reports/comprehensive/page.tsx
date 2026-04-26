@@ -577,7 +577,7 @@ export default function ComprehensiveReportPage() {
                        />
                     </TableHead>
                   ))}
-                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2]/95 border-l border-blue-300">
+                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2] border-l border-blue-300 sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
@@ -641,7 +641,7 @@ export default function ComprehensiveReportPage() {
                             )}
                         </TableCell>
                       ))}
-                      <TableCell className="p-2 text-center border-l bg-blue-50/5"></TableCell>
+                      <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                     </TableRow>
                   );
                 }) : (

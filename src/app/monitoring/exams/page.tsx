@@ -870,7 +870,7 @@ export default function ExamsPage() {
                 proctor2: String(row['CBCT 02'] || ''),
                 proctor3: String(row['CBCT 03'] || ''),
                 content: String(row['Nội dung'] || ''), 
-                status: String(row['Trạng thái'] || 'Phòng thi') 
+                status: 'Phòng thi'
             }, { merge: true });
         }
         await batch.commit(); setIsProcessingImport(false); setIsImportPreviewOpen(false); toast({ title: "Import thành công" });
@@ -882,7 +882,22 @@ export default function ExamsPage() {
     };
 
     const allColumns = ['date', 'building', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'proctor1', 'proctor2', 'proctor3', 'content', 'status', 'note'];
-    const columnDefs: Record<string, string> = { date: 'Ngày', building: 'Dãy nhà', room: 'Phòng', period: 'Tiết', type: 'LT/TH', department: 'Khoa sử dụng', class: 'Lớp', studentCount: 'Sĩ số', proctor1: 'CBCT 01', proctor2: 'CBCT 02', proctor3: 'CBCT 03', content: 'Nội dung', status: 'Trạng thái', note: 'Ghi chú' };
+    const columnDefs: Record<string, string> = { 
+        date: 'Ngày', 
+        building: 'Dãy nhà', 
+        room: 'Phòng', 
+        period: 'Tiết', 
+        type: 'LT/TH', 
+        department: 'Khoa sử dụng', 
+        class: 'Lớp', 
+        studentCount: 'Sĩ số', 
+        proctor1: 'CBCT 1', 
+        proctor2: 'CBCT 2', 
+        proctor3: 'CBCT 3', 
+        content: 'Nội dung', 
+        status: 'Trạng thái',
+        note: 'Ghi chú'
+    };
     const columnIcons: Record<string, any> = {
         date: CalendarDays,
         building: Map,
@@ -926,7 +941,7 @@ export default function ExamsPage() {
                                         <TableRow className="bg-[#1877F2] hover:bg-[#1877F2]/90">
                                             <TableHead className="w-[80px] font-bold text-sm text-white text-center border-r border-blue-300">#</TableHead>
                                             {orderedColumns.map(key => (<TableHead key={key} className="text-white border-r border-blue-300 p-0 h-auto"><ColumnHeader columnKey={key} title={columnDefs[key]} icon={columnIcons[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any) => setSortConfig([{key:k, direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} /></TableHead>))}
-                                            <TableHead className="w-16 text-center text-white font-bold text-sm">
+                                            <TableHead className="w-16 text-center text-white font-bold text-sm sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <DropdownMenu>
@@ -945,7 +960,7 @@ export default function ExamsPage() {
                                             const isHandled = item.recognitionDate && item.employee && item.incident;
                                             return (
                                                 <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/30 transition-all hover:bg-yellow-300 hover:text-black", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
-                                                    <TableCell className="font-medium text-center align-middle py-3 border-r text-inherit">
+                                                    <TableCell className="font-medium text-center align-middle py-3 border-r text-inherit w-[80px]">
                                                         {isHandled ? (
                                                             <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1 rounded-full border-2 border-red-500 text-red-600 font-black text-sm">
                                                                 {startIndex + idx + 1}
@@ -955,16 +970,21 @@ export default function ExamsPage() {
                                                         )}
                                                     </TableCell>
                                                     {orderedColumns.map(key => (
-                                                        <TableCell key={key} className="font-medium border-r py-3">
-                                                            {key === 'status' ? (<div>{item.status}{item.incident && <Badge variant="destructive" className="ml-2 text-[10px] h-4 px-1">{item.incident}</Badge>}</div>) : 
-                                                             key === 'type' ? (item.type ? <Badge variant="outline">{item.type}</Badge> : '---') :
-                                                             key === 'proctor1' ? (item.proctor1 || '---') :
-                                                             key === 'proctor2' ? (item.proctor2 || '---') :
-                                                             key === 'proctor3' ? (item.proctor3 || '---') :
-                                                             String((item as any)[key] ?? '')}
+                                                        <TableCell key={key} className="font-medium border-r py-3 text-inherit align-middle">
+                                                            {key === 'status' ? (
+                                                                item.status || "Phòng thi"
+                                                            ) : key === 'type' ? (
+                                                                item.type ? <Badge variant="outline">{item.type}</Badge> : '---'
+                                                            ) : key === 'recognitionDate' ? (
+                                                                item.recognitionDate?.includes('-') ? item.recognitionDate.split('-').reverse().join('/') : (item.recognitionDate || '---')
+                                                            ) : key === 'incident' ? (
+                                                                item.incident ? <Badge variant="destructive" className="text-[10px] uppercase font-bold">{item.incident}</Badge> : '---'
+                                                            ) : key === 'incidentDetail' ? (
+                                                                <span className="text-[10px] text-orange-600 font-medium">{item.incidentDetail || '---'}</span>
+                                                            ) : String((item as any)[key] ?? '')}
                                                         </TableCell>
                                                     ))}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
+                                                    <TableCell className="w-16 p-0 text-center border-l border-blue-100 sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] align-middle">
                                                         <div onClick={e => e.stopPropagation()}>
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>

@@ -99,10 +99,11 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
     );
 };
 
-const MultiSelect = ({ options, selected, onChange, placeholder, emptyText }: any) => {
+const MultiSelect = ({ options, selected = [], onChange, placeholder, emptyText }: any) => {
     const [open, setOpen] = useState(false);
+    const safeSelected = Array.isArray(selected) ? selected : [];
     const handleSelect = (value: string) => {
-        const newSelected = selected.includes(value) ? selected.filter((i: string) => i !== value) : [...selected, value];
+        const newSelected = safeSelected.includes(value) ? safeSelected.filter((i: string) => i !== value) : [...safeSelected, value];
         onChange(newSelected);
     };
     return (
@@ -110,8 +111,8 @@ const MultiSelect = ({ options, selected, onChange, placeholder, emptyText }: an
             <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-between h-auto min-h-10 py-2 px-3 text-left font-normal flex items-center gap-2 overflow-hidden">
                     <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                        {selected.length === 0 && <span className="text-muted-foreground truncate">{placeholder}</span>}
-                        {selected.map((val: string) => (
+                        {safeSelected.length === 0 && <span className="text-muted-foreground truncate">{placeholder}</span>}
+                        {safeSelected.map((val: string) => (
                             <Badge key={val} variant="secondary" className="max-w-[150px] inline-flex items-center gap-1 px-2 shrink-0">
                                 <span className="truncate flex-1">{options.find((o: any) => o.value === val)?.label || val}</span>
                                 <X className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer" onClick={(e) => { e.stopPropagation(); handleSelect(val); }} />
@@ -129,7 +130,7 @@ const MultiSelect = ({ options, selected, onChange, placeholder, emptyText }: an
                         <CommandGroup>
                             {options.map((option: any) => (
                                 <CommandItem key={option.value} onSelect={() => handleSelect(option.value)}>
-                                    <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", selected.includes(option.value) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible")}>
+                                    <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", safeSelected.includes(option.value) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible")}>
                                         <Check className="h-4 w-4" />
                                     </div>
                                     <span>{option.label}</span>
@@ -343,7 +344,16 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, blockOp
                     </ScrollArea>
                 </div>
                 <DialogFooter className="p-4 border-t">
-                    <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={() => setFilters({ date: format(new Date(), 'yyyy-MM-dd'), departments: [], lecturers: [], periodSession: 'all', periodStart: '', periodEnd: '' })}>Xóa tất cả</Button></TooltipTrigger><TooltipContent><p>{t('Thiết lập lại bộ lọc')}</p></TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={() => setFilters({ 
+                        date: format(new Date(), 'yyyy-MM-dd'), 
+                        departments: [], 
+                        lecturers: [], 
+                        buildings: [],
+                        rooms: [],
+                        periodSession: 'all', 
+                        periodStart: '', 
+                        periodEnd: '' 
+                    })}>Xóa tất cả</Button></TooltipTrigger><TooltipContent><p>{t('Thiết lập lại bộ lọc')}</p></TooltipContent></Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button></TooltipTrigger><TooltipContent><p>{t('Áp dụng bộ lọc')}</p></TooltipContent></Tooltip>
                 </DialogFooter>
             </DialogContent>
@@ -856,7 +866,20 @@ export default function ExternalPracticePage() {
     };
 
     const allColumns = ['date', 'building', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'lecturer', 'content', 'status', 'note'];
-    const columnDefs: Record<string, string> = { date: 'Ngày', building: 'Dãy nhà', room: 'Phòng', period: 'Tiết', type: 'LT/TH', department: 'Khoa sử dụng', class: 'Lớp', studentCount: 'Sĩ số', lecturer: 'Giảng viên', content: 'Nội dung', status: 'Trạng thái', note: 'Ghi chú' };
+    const columnDefs: Record<string, string> = { 
+        date: 'Ngày', 
+        building: 'Dãy nhà', 
+        room: 'Phòng', 
+        period: 'Tiết', 
+        type: 'LT/TH', 
+        department: 'Khoa sử dụng', 
+        class: 'Lớp', 
+        studentCount: 'Sĩ số', 
+        lecturer: 'Giảng viên', 
+        content: 'Nội dung', 
+        status: 'Trạng thái',
+        note: 'Ghi chú'
+    };
     const columnIcons: Record<string, any> = {
         date: CalendarDays,
         building: Map,
@@ -898,7 +921,7 @@ export default function ExternalPracticePage() {
                                         <TableRow className="bg-[#1877F2] hover:bg-[#1877F2]/90">
                                             <TableHead className="w-[80px] font-bold text-xs text-white text-center border-r border-blue-300">#</TableHead>
                                             {orderedColumns.map(key => (<TableHead key={key} className="text-white border-r border-blue-300 p-0 h-auto"><ColumnHeader columnKey={key} title={columnDefs[key]} icon={columnIcons[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any) => setSortConfig([{key:k, direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} /></TableHead>))}
-                                            <TableHead className="w-16 text-center text-white font-bold text-base">
+                                            <TableHead className="w-16 text-center text-white font-bold text-base sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <DropdownMenu>
@@ -917,7 +940,7 @@ export default function ExternalPracticePage() {
                                             const isHandled = item.recognitionDate && item.employee && item.incident;
                                             return (
                                                 <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/30 transition-all hover:bg-yellow-300 hover:text-black", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
-                                                    <TableCell className="font-medium text-center align-middle py-3 border-r text-inherit">
+                                                    <TableCell className="font-medium text-center align-middle py-3 border-r text-inherit w-[80px]">
                                                         {isHandled ? (
                                                             <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-1 rounded-full border-2 border-red-500 text-red-600 font-black text-sm">
                                                                 {startIndex + idx + 1}
@@ -926,8 +949,22 @@ export default function ExternalPracticePage() {
                                                             startIndex + idx + 1
                                                         )}
                                                     </TableCell>
-                                                    {orderedColumns.map(key => <TableCell key={key} className="font-medium border-r py-3">{key === 'status' ? (<div>{item.status}{item.incident && <Badge variant="destructive" className="ml-2 text-[10px] h-4 px-1">{item.incident}</Badge>}</div>) : key === 'type' ? (item.type ? <Badge variant="outline">{item.type}</Badge> : '---') : String((item as any)[key] ?? '')}</TableCell>)}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
+                                                    {orderedColumns.map(key => (
+                                                        <TableCell key={key} className="font-medium border-r py-3 text-inherit align-middle">
+                                                            {key === 'status' ? (
+                                                                item.status || "Phòng học"
+                                                            ) : key === 'type' ? (
+                                                                item.type ? <Badge variant="outline">{item.type}</Badge> : '---'
+                                                            ) : key === 'recognitionDate' ? (
+                                                                item.recognitionDate?.includes('-') ? item.recognitionDate.split('-').reverse().join('/') : (item.recognitionDate || '---')
+                                                            ) : key === 'incident' ? (
+                                                                item.incident ? <Badge variant="destructive" className="text-[10px] uppercase font-bold">{item.incident}</Badge> : '---'
+                                                            ) : key === 'incidentDetail' ? (
+                                                                <span className="text-[10px] text-orange-600 font-medium">{item.incidentDetail || '---'}</span>
+                                                            ) : String((item as any)[key] ?? '')}
+                                                        </TableCell>
+                                                    ))}
+                                                    <TableCell className="w-16 p-0 text-center border-l border-blue-100 sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] align-middle">
                                                         <div onClick={e => e.stopPropagation()}>
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>

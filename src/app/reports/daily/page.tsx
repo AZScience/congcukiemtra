@@ -8,7 +8,7 @@ import {
   BookOpenCheck, Building, ClipboardList, CheckCircle2,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, X, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Cog,
   CloudUpload, Loader2, ShieldCheck, School, Hash, Landmark, Library, User, Book, AlertTriangle, Info, UserCheck,
-  Users, Layers, IdCard, StickyNote, CalendarCheck, MapPin
+  Users, Layers, IdCard, StickyNote, CalendarCheck, MapPin, Bell
 } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -355,11 +355,7 @@ export default function DailyReportPage() {
                     className="h-10 focus:ring-blue-500/20"
                   />
                 </div>
-                <Tooltip><TooltipTrigger asChild><Button variant="default" className="bg-[#1877F2] hover:bg-blue-700 shadow-md">
-                  <Search className="h-4 w-4 mr-2" /> Xem báo cáo
-                </Button></TooltipTrigger><TooltipContent><p>{t('Xem báo cáo cho ngày đã chọn')}</p></TooltipContent></Tooltip>
               </div>
-              
               <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1">
                 <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={handleExportAll} className="border-green-500 text-green-700 hover:bg-green-600 hover:text-white shadow-sm transition-all active:scale-95">
                   <FileDown className="h-4 w-4 mr-2" /> Xuất Excel (Tất cả)
@@ -377,68 +373,68 @@ export default function DailyReportPage() {
               <TabsTrigger 
                 value="in-person" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#16a34a] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 )}
               >
                 <ClipboardList className="h-4 w-4" /> 
                 <span className="truncate">KIỂM TRA PHÒNG HỌC</span>
-                {inPersonData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-white/20 text-white border-none">{inPersonData.length}</Badge>}
+                {inPersonData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-white/20 text-white border-none hidden group-data-[state=active]:inline-flex">{inPersonData.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger 
                 value="online" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#eab308] data-[state=active]:text-black data-[state=active]:shadow-lg"
                 )}
               >
                 <Laptop className="h-4 w-4" /> 
                 <span className="truncate">KIỂM TRA TRỰC TUYẾN</span>
-                {onlineData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-black/10 text-black border-none">{onlineData.length}</Badge>}
+                {onlineData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-black/10 text-black border-none hidden group-data-[state=active]:inline-flex">{onlineData.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger 
                 value="homeroom" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#16a34a] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 )}
               >
                 <BookUser className="h-4 w-4" /> 
                 <span className="truncate">SINH HOẠT CỐ VẤN</span>
-                {homeroomData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-white/20 text-white border-none">{homeroomData.length}</Badge>}
+                {homeroomData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-white/20 text-white border-none hidden group-data-[state=active]:inline-flex">{homeroomData.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger 
                 value="violations" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#dc2626] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 )}
               >
                 <ShieldAlert className="h-4 w-4" /> 
                 <span className="truncate">SINH VIÊN VI PHẠM</span>
-                {violationData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-white/20 text-white border-none">{violationData.length}</Badge>}
+                {violationData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-white/20 text-white border-none hidden group-data-[state=active]:inline-flex">{violationData.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger 
                 value="exams" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#16a34a] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 )}
               >
                 <BookOpenCheck className="h-4 w-4" /> 
                 <span className="truncate">THI KẾT THÚC MÔN</span>
-                {examData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-white/20 text-white border-none">{examData.length}</Badge>}
+                {examData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-white/20 text-white border-none hidden group-data-[state=active]:inline-flex">{examData.length}</Badge>}
               </TabsTrigger>
               <TabsTrigger 
                 value="external" 
                 className={cn(
-                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300",
+                  "flex-1 h-12 gap-2 text-[11px] font-bold uppercase transition-all duration-300 group",
                   "data-[state=active]:bg-[#eab308] data-[state=active]:text-black data-[state=active]:shadow-lg"
                 )}
               >
                 <Building className="h-4 w-4" /> 
                 <span className="truncate">THỰC HÀNH NGOÀI</span>
-                {externalData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex justify-center items-center bg-black/10 text-black border-none">{externalData.length}</Badge>}
+                {externalData.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center items-center bg-black/10 text-black border-none hidden group-data-[state=active]:inline-flex">{externalData.length}</Badge>}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -458,9 +454,10 @@ export default function DailyReportPage() {
                 lecturer: "Giảng viên",
                 content: "Nội dung",
                 incident: "Việc phát sinh",
+                isNotification: "Thông báo",
                 incidentDetail: "Chi tiết sự cố"
               }}
-              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'incidentDetail']}
+              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail']}
             />
           </TabsContent>
           
@@ -480,9 +477,10 @@ export default function DailyReportPage() {
                 lecturer: "Giảng viên",
                 content: "Môn học",
                 incident: "Việc phát sinh",
+                isNotification: "Thông báo",
                 incidentDetail: "Chi tiết sự cố"
               }}
-              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'incidentDetail']}
+              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail']}
             />
           </TabsContent>
           
@@ -504,9 +502,10 @@ export default function DailyReportPage() {
                 lecturer: "Giảng viên",
                 studentCount: "SV dự",
                 incident: "Việc phát sinh",
+                isNotification: "Thông báo",
                 incidentDetail: "Chi tiết sự việc"
               }}
-              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'studentCount', 'incident', 'incidentDetail']}
+              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'studentCount', 'incident', 'isNotification', 'incidentDetail']}
             />
           </TabsContent>
           
@@ -533,9 +532,10 @@ export default function DailyReportPage() {
                 proctor3: "CBCT 3",
                 content: "Môn thi",
                 incident: "Việc phát sinh",
+                isNotification: "Thông báo",
                 incidentDetail: "Chi tiết sự cố"
               }}
-              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'proctor1', 'proctor2', 'proctor3', 'content', 'incident', 'incidentDetail']}
+              orderedColumns={['employee', 'date', 'room', 'period', 'department', 'class', 'proctor1', 'proctor2', 'proctor3', 'content', 'incident', 'isNotification', 'incidentDetail']}
             />
           </TabsContent>
           
@@ -558,9 +558,10 @@ export default function DailyReportPage() {
                 lecturer: "Giảng viên",
                 content: "Nội dung",
                 incident: "Việc phát sinh",
+                isNotification: "Thông báo",
                 incidentDetail: "Chi tiết sự cố"
               }}
-              orderedColumns={['employee', 'date', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'lecturer', 'content', 'incident', 'incidentDetail']}
+              orderedColumns={['employee', 'date', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail']}
             />
           </TabsContent>
         </Tabs>
@@ -622,16 +623,31 @@ function ReportTable({
     studentCount: Users,
     type: Layers,
     incident: AlertTriangle,
+    isNotification: Bell,
     incidentDetail: Info
   };
 
-  const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>(`daily_report_colvis_${title}`, 
+  // Tạo key an toàn cho LocalStorage (không dấu, không khoảng trắng)
+  const slugTitle = title.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>(`daily_report_colvis_${slugTitle}`, 
     orderedColumns.reduce((acc, col) => ({ ...acc, [col]: true }), {})
   );
 
-  const isVisible = useCallback((col: string) => columnVisibility[col] !== false, [columnVisibility]);
+  const isVisible = (col: string) => columnVisibility[col] !== false;
+  
   const toggleColumn = (col: string) => {
-    setColumnVisibility(prev => ({ ...prev, [col]: !isVisible(col) }));
+    console.log(`Toggling column: ${col} for ${slugTitle}`);
+    setColumnVisibility(prev => {
+        const next = { ...prev, [col]: !isVisible(col) };
+        return next;
+    });
   };
 
   // Fetch tabs when dialog opens
@@ -738,11 +754,18 @@ function ReportTable({
           </CardTitle>
           
           <div className="flex items-center gap-2">
-            <Dialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
+            <Dialog open={isPushDialogOpen} onOpenChange={(open) => {
+                console.log("Dialog Open State:", open);
+                setIsPushDialogOpen(open);
+            }}>
                 <DialogTrigger asChild>
-                    <Tooltip><TooltipTrigger asChild><Button variant="outline" className="h-9 border-orange-500 text-orange-700 hover:bg-orange-600 hover:text-white shadow-sm">
+                    <Button 
+                        variant="outline" 
+                        className="h-9 border-orange-500 text-orange-700 hover:bg-orange-600 hover:text-white shadow-sm"
+                        onClick={() => console.log("Push Button Clicked")}
+                    >
                         <CloudUpload className="h-4 w-4 mr-2" /> Đẩy lên GoogleSheet
-                    </Button></TooltipTrigger><TooltipContent><p>{t('Đẩy dữ liệu bảng hiện tại lên Google Sheet')}</p></TooltipContent></Tooltip>
+                    </Button>
                 </DialogTrigger>
                 <DialogContent>
                     <DialogHeader>
@@ -815,14 +838,19 @@ function ReportTable({
                    />
                 </TableHead>
               ))}
-              <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2]/95 border-l border-blue-300">
+              <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2] border-l border-blue-300 sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-14 w-16 text-white hover:bg-white/20 rounded-none transition-colors"
+                            onClick={() => console.log("ReportTable Cog Clicked")}
+                          >
                               <Cog className="h-5 w-5" />
-                          </Button></TooltipTrigger><TooltipContent><p>{t('Cài đặt hiển thị')}</p></TooltipContent></Tooltip>
+                          </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 shadow-xl border-blue-100">
+                      <DropdownMenuContent align="end" className="w-56 shadow-2xl border-blue-200 z-[100]" sideOffset={8}>
                           <DropdownMenuLabel className="font-bold text-blue-700 text-xs">Hiển thị cột</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {orderedColumns.map(col => (
@@ -864,7 +892,7 @@ function ReportTable({
                     )}
                   </TableCell>
                   {orderedColumns.filter(isVisible).map(key => (
-                    <TableCell key={key} className="border-r py-3 align-middle text-inherit">
+                    <TableCell key={key} className="font-medium border-r py-3 align-middle text-inherit">
                       {key === 'incident' ? (
                         item.incident ? (
                           <Badge className={cn(
@@ -878,6 +906,12 @@ function ReportTable({
                         ) : (
                           <span className="text-green-600 text-[10px] font-bold">Bình thường</span>
                         )
+                      ) : key === 'isNotification' ? (
+                        item.isNotification ? (
+                          <Badge className="bg-orange-100 text-orange-700 border-orange-200 font-bold text-[10px]">Có</Badge>
+                        ) : (
+                          <span className="text-gray-400">---</span>
+                        )
                       ) : key === 'type' ? (
                         <Badge variant="outline" className="font-bold border-blue-200 text-blue-700 bg-blue-50">{item.type || "TH"}</Badge>
                       ) : key === 'class' ? (
@@ -887,7 +921,7 @@ function ReportTable({
                       ) : String((item as any)[key] ?? '---')}
                     </TableCell>
                   ))}
-                  <TableCell className="p-2 text-center border-l bg-blue-50/5"></TableCell>
+                  <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                 </TableRow>
               );
             }) : (
@@ -945,11 +979,20 @@ function ViolationTable({ data, loading, t }: { data: StudentViolation[], loadin
   const title = "BÁO CÁO GHI NHẬN SINH VIÊN VI PHẠM";
 
   const orderedColumns = ['fullName', 'class', 'studentId', 'violationDate', 'violationType', 'officer', 'note'];
-  const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>(`daily_report_colvis_${title}`, 
+  const slugTitle = title.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>(`daily_report_colvis_${slugTitle}`, 
     orderedColumns.reduce((acc, col) => ({ ...acc, [col]: true }), {})
   );
 
-  const isVisible = useCallback((col: string) => columnVisibility[col] !== false, [columnVisibility]);
+  const isVisible = (col: string) => columnVisibility[col] !== false;
+  
   const toggleColumn = (col: string) => {
     setColumnVisibility(prev => ({ ...prev, [col]: !isVisible(col) }));
   };
@@ -1064,9 +1107,16 @@ function ViolationTable({ data, loading, t }: { data: StudentViolation[], loadin
           </CardTitle>
           
           <div className="flex items-center gap-2">
-            <Dialog open={isPushDialogOpen} onOpenChange={setIsPushDialogOpen}>
+            <Dialog open={isPushDialogOpen} onOpenChange={(open) => {
+                console.log("Violation Dialog Open State:", open);
+                setIsPushDialogOpen(open);
+            }}>
                 <DialogTrigger asChild>
-                    <Button variant="outline" className="h-9 border-orange-500 text-orange-700 hover:bg-orange-600 hover:text-white shadow-sm">
+                    <Button 
+                        variant="outline" 
+                        className="h-9 border-orange-500 text-orange-700 hover:bg-orange-600 hover:text-white shadow-sm"
+                        onClick={() => console.log("Violation Push Button Clicked")}
+                    >
                         <CloudUpload className="h-4 w-4 mr-2" /> Đẩy lên GoogleSheet
                     </Button>
                 </DialogTrigger>
@@ -1149,14 +1199,19 @@ function ViolationTable({ data, loading, t }: { data: StudentViolation[], loadin
                    />
                 </TableHead>
               ))}
-              <TableHead className="w-16 text-center text-white p-0 bg-[#dc2626]/95 border-l border-red-300">
+              <TableHead className="w-16 text-center text-white p-0 bg-[#dc2626] border-l border-red-300 sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                   <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-red-700/50 transition-colors">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-14 w-16 text-white hover:bg-white/20 rounded-none transition-colors"
+                            onClick={() => console.log("ViolationTable Cog Clicked")}
+                          >
                               <Cog className="h-5 w-5" />
                           </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 shadow-xl border-red-100">
+                      <DropdownMenuContent align="end" className="w-56 shadow-2xl border-red-200 z-[100]" sideOffset={8}>
                           <DropdownMenuLabel className="font-bold text-red-700 text-xs">Hiển thị cột</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {orderedColumns.map(col => (
@@ -1236,7 +1291,7 @@ function ViolationTable({ data, loading, t }: { data: StudentViolation[], loadin
                       )}
                     </React.Fragment>
                   ))}
-                  <TableCell className="p-2 text-center border-l bg-rose-50/5"></TableCell>
+                  <TableCell className="p-2 text-center border-l bg-rose-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                 </TableRow>
               );
             }) : (

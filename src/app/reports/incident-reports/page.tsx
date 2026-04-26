@@ -498,7 +498,7 @@ export default function PetitionsReportPage() {
                       <ColumnHeader columnKey="note" title="Ghi chú" icon={StickyNote} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={requestSort} clearSort={clearSort} filters={columnFilters} handleFilterChange={handleFilterChange} />
                     </TableHead>
                   )}
-                  <TableHead rowSpan={2} className="w-16 text-center text-white p-0 bg-[#1877F2]/95 border-l border-b border-blue-300 align-middle">
+                  <TableHead rowSpan={2} className="w-16 text-center text-white p-0 bg-[#1877F2] border-l border-b border-blue-300 align-middle sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
@@ -575,7 +575,7 @@ export default function PetitionsReportPage() {
                     {isVisible('transfer') && <TableCell className="border-r p-2 text-center">{item.transfer}</TableCell>}
                     {isVisible('result') && <TableCell className="border-r p-2 text-center text-red-600 font-medium">{item.result}</TableCell>}
                     {isVisible('note') && <TableCell className="text-center border-r p-2 text-gray-500">{item.note}</TableCell>}
-                    <TableCell className="p-2 text-center border-l bg-blue-50/5"></TableCell>
+                    <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>

@@ -920,9 +920,9 @@ export default function RequestsPage() {
                                                     <ColumnHeader columnKey={k} title={columnDefs[k]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any,d:any)=>setSortConfig([{key:k,direction:d}])} clearSort={()=>setSortConfig([])} filters={filters} handleFilterChange={(k:any,v:any)=>{setFilters((p:any)=>({...p,[k]:v})); setCurrentPage(1);}} icon={colIcons[k]} />
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="w-16 text-center text-white font-bold text-base">
+                                            <TableHead className="w-16 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400 p-0 text-center">
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
                                                         <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
                                                         <DropdownMenuSeparator />
@@ -943,7 +943,7 @@ export default function RequestsPage() {
                                                                     onClick={() => handleRowClick(item.renderId)} 
                                                                     data-state={isSelected ? "selected" : ""} 
                                                                     className={cn(
-                                                                        "cursor-pointer odd:bg-white even:bg-muted/10 transition-all hover:bg-yellow-300 hover:text-black", 
+                                                                        "cursor-pointer odd:bg-white even:bg-slate-50 transition-all hover:bg-yellow-300 hover:text-black group", 
                                                                         "data-[state=selected]:bg-red-800 data-[state=selected]:text-white"
                                                                     )}
                                                                 >
@@ -955,7 +955,7 @@ export default function RequestsPage() {
                                                                             {String(item[k as keyof RequestType] || '')}
                                                                         </TableCell>
                                                                     ))}
-                                                                    <TableCell className="text-center py-3 text-inherit align-middle">
+                                                                    <TableCell className="sticky right-0 z-10 bg-white group-data-[state=selected]:bg-red-800 group-hover:bg-yellow-300 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle">
                                                                         <div onClick={e => e.stopPropagation()}>
                                                                             <DropdownMenu modal={false}>
                                                                                 <DropdownMenuTrigger asChild>

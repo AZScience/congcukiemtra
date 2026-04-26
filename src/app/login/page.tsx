@@ -179,8 +179,8 @@ export default function LoginPage() {
       <div className="hidden lg:relative lg:flex items-end p-10">
         <div className="absolute inset-0">
             <Image
-              src={defaultLoginImage}
-              alt="Image"
+              src={params.loginImageUrl || defaultLoginImage}
+              alt="Login Background"
               fill
               priority
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -190,8 +190,8 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10 text-white">
             <div className="space-y-2">
-                <blockquote className="text-lg font-medium">&ldquo;Công nghệ chỉ là một công cụ. Về mặt khích lệ bọn trẻ làm việc cùng nhau và động viên chúng, giáo viên là người quan trọng nhất.&rdquo;</blockquote>
-                <footer className="text-sm font-medium">Bill Gates</footer>
+                <blockquote className="text-lg font-medium">&ldquo;{params.loginQuote || "Công nghệ chỉ là một công cụ. Về mặt khích lệ bọn trẻ làm việc cùng nhau và động viên chúng, giáo viên là người quan trọng nhất."}&rdquo;</blockquote>
+                <footer className="text-sm font-medium">{params.loginQuoteAuthor || "Bill Gates"}</footer>
             </div>
         </div>
       </div>

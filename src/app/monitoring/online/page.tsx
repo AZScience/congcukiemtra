@@ -927,12 +927,12 @@ export default function OnlinePage() {
                                                     />
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400">
+                                            <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700">
+                                                                <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors">
                                                                     <Cog className="h-5 w-5" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
@@ -972,7 +972,7 @@ export default function OnlinePage() {
                                                     onClick={() => handleRowClick(item.renderId)} 
                                                     data-state={isSelected ? "selected" : ""} 
                                                     className={cn(
-                                                        "cursor-pointer odd:bg-white even:bg-muted/30 transition-all hover:bg-yellow-300 hover:text-black", 
+                                                        "cursor-pointer odd:bg-white even:bg-slate-50 transition-all hover:bg-yellow-300 hover:text-black group", 
                                                         "data-[state=selected]:bg-red-800 data-[state=selected]:text-white"
                                                     )}
                                                 >
@@ -996,7 +996,7 @@ export default function OnlinePage() {
                                                             )}
                                                         </TableCell>
                                                     ))}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
+                                                    <TableCell className="w-[60px] p-0 text-center border-l border-blue-100 sticky right-0 z-10 bg-white group-data-[state=selected]:bg-red-800 group-hover:bg-yellow-300 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] align-middle">
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <DropdownMenu modal={false}>

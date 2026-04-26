@@ -286,7 +286,7 @@ function PropertyDataTable({ data, emptyMessage }: { data: any[], emptyMessage: 
                             {returnColSpan > 0 && <TableHead colSpan={returnColSpan} className="text-center font-bold text-sm text-white border-r border-b border-blue-300 p-2 uppercase bg-[#1877F2]/80">Phần giao trả</TableHead>}
                             {gratitudeColSpan > 0 && <TableHead colSpan={gratitudeColSpan} className="text-center font-bold text-sm text-white border-b border-blue-300 p-2 uppercase bg-[#1877F2]/90">Phần tri ân</TableHead>}
                             
-                            <TableHead rowSpan={2} className="w-16 text-center text-white p-0 border-b border-l border-blue-300 align-middle bg-[#1877F2]/95">
+                            <TableHead rowSpan={2} className="w-16 text-center text-white p-0 border-b border-l border-blue-300 align-middle bg-[#1877F2] sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
@@ -481,7 +481,7 @@ function PropertyDataTable({ data, emptyMessage }: { data: any[], emptyMessage: 
                                 {isVisible('appreciationId') && <TableCell className="text-center border-r p-2">{item.appreciationId}</TableCell>}
                                 {isVisible('appreciationDept') && <TableCell className="border-r p-2">{item.appreciationDept}</TableCell>}
                                 {isVisible('note') && <TableCell className="border-r p-2">{item.note}</TableCell>}
-                                <TableCell className="p-2 text-center border-l bg-blue-50/10"></TableCell>
+                                <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -587,7 +587,7 @@ function DataTable({ data, columns, emptyMessage }: { data: any[], columns: {key
                                     </TableHead>
                                 );
                             })}
-                            <TableHead className="w-16 text-center text-white p-0 border-l border-blue-300 bg-[#1877F2]/95">
+                            <TableHead className="w-16 text-center text-white p-0 border-l border-blue-300 bg-[#1877F2] sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50">
@@ -627,7 +627,7 @@ function DataTable({ data, columns, emptyMessage }: { data: any[], columns: {key
                                 {columns.filter(col => isVisible(col.key)).map(col => (
                                     <TableCell key={col.key} className="border-r p-2 text-gray-800">{item[col.key]}</TableCell>
                                 ))}
-                                <TableCell className="p-2 text-center border-l bg-blue-50/10"></TableCell>
+                                <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
