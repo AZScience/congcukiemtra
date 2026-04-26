@@ -144,7 +144,9 @@ export function CustomGoogleForm() {
 
       const dataToPush = [{
         timestamp: timestamp,
+        email: formData.email || authUser?.email || "",
         employeeName: formData.employeeName || authUser?.displayName || "Cán bộ kiểm tra",
+        date: formData.date || format(now, 'yyyy-MM-dd'),
         proofPrinted: printedUrl,
         proofOnline: onlineUrl,
         proofIncident: incidentUrl,

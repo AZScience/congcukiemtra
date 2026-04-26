@@ -170,9 +170,9 @@ export default function SystemParametersPage() {
     setIsVerifyingGoogle(true);
     try {
       const res = await verifyGoogleSheetConnection(
-        localParams.googleSheetId,
-        localParams.googleServiceAccountEmail,
-        localParams.googlePrivateKey,
+        localParams.googleSheetId || "",
+        localParams.googleServiceAccountEmail || "",
+        localParams.googlePrivateKey || "",
         localParams.faqSheetTabName
       );
       if (res.success) toast({ title: "Kết nối thành công", description: res.message });
@@ -190,9 +190,9 @@ export default function SystemParametersPage() {
     try {
       // 1. Check Sheet
       const sheetRes = await verifyGoogleSheetConnection(
-        localParams.feedbackSheetId || localParams.googleSheetId,
-        localParams.evidenceServiceAccountEmail || localParams.googleServiceAccountEmail,
-        localParams.evidencePrivateKey || localParams.googlePrivateKey,
+        localParams.feedbackSheetId || localParams.googleSheetId || "",
+        localParams.evidenceServiceAccountEmail || localParams.googleServiceAccountEmail || "",
+        localParams.evidencePrivateKey || localParams.googlePrivateKey || "",
         localParams.feedbackTabName
       );
       
@@ -204,9 +204,9 @@ export default function SystemParametersPage() {
 
       // 2. Check Drive
       const driveRes = await verifyGoogleDriveConnection(
-        localParams.googleDriveFolderId,
-        localParams.evidenceServiceAccountEmail || localParams.googleServiceAccountEmail,
-        localParams.evidencePrivateKey || localParams.googlePrivateKey
+        localParams.googleDriveFolderId || "",
+        localParams.evidenceServiceAccountEmail || localParams.googleServiceAccountEmail || "",
+        localParams.evidencePrivateKey || localParams.googlePrivateKey || ""
       );
 
       if (driveRes.success) {

@@ -143,7 +143,7 @@ export async function pushToGoogleSheetDynamic(
             try {
                 // Sử dụng dòng 1 (dòng dữ liệu đầu tiên) làm mẫu nếu có thể, hoặc dòng cuối cùng
                 const sourceRowIndex = lastDataRowIndex >= 1 ? 1 : 0;
-                await sheet.copyPaste(
+                await (sheet as any).copyPaste(
                     { startRowIndex: sourceRowIndex, endRowIndex: sourceRowIndex + 1, startColumnIndex: 0, endColumnIndex: sheet.columnCount },
                     { startRowIndex: targetRowIndex, endRowIndex: neededRows, startColumnIndex: 0, endColumnIndex: sheet.columnCount },
                     'PASTE_FORMAT'
@@ -272,7 +272,7 @@ export async function pushDailyReportToGoogleSheet(
         if (lastDataRowIndex > 0 && data.length > 0) {
             try {
                 const sourceRowIndex = lastDataRowIndex >= 1 ? 1 : 0;
-                await sheet.copyPaste(
+                await (sheet as any).copyPaste(
                     { startRowIndex: sourceRowIndex, endRowIndex: sourceRowIndex + 1, startColumnIndex: 0, endColumnIndex: sheet.columnCount },
                     { startRowIndex: targetRowIndex, endRowIndex: neededRows, startColumnIndex: 0, endColumnIndex: sheet.columnCount },
                     'PASTE_FORMAT'

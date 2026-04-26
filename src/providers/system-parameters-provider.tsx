@@ -63,9 +63,7 @@ const DEFAULT_PARAMS: SystemParameters = {
     aiTemperature: 0.7,
     loginImageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmd8ZW58MHx8fHwxNzIxOTU4OTg5fDA&ixlib=rb-4.0.3&q=80&w=1080",
     loginQuote: "Công nghệ chỉ là một công cụ. Về mặt khích lệ bọn trẻ làm việc cùng nhau và động viên chúng, giáo viên là người quan trọng nhất.",
-    loginQuoteAuthor: "Bill Gates",
-    feedbackSheetId: "",
-    feedbackTabName: "Biểu mẫu 1"
+    loginQuoteAuthor: "Bill Gates"
 };
 
 interface SystemParametersContextType {
