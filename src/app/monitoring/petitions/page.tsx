@@ -22,12 +22,14 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { usePermissions } from "@/hooks/use-permissions";
 import * as XLSX from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useMasterData } from "@/providers/master-data-provider";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
@@ -146,6 +148,7 @@ const ColumnHeader = ({ columnKey, title, t, sortConfig, openPopover, setOpenPop
                     ) : (
                         <ArrowUpDown className={cn("ml-2 h-4 w-4 opacity-50", isFiltered ? "text-red-500" : "group-hover:opacity-100")} />
                     )}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0" align="start">
@@ -617,6 +620,7 @@ export default function PetitionsPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { toast } = useToast();
+    const permissions = usePermissions('/monitoring/petitions');
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const { user: authUser } = useUser();
@@ -837,9 +841,9 @@ export default function PetitionsPage() {
                                 <div className="flex items-center gap-2">
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    {permissions.import && <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>}
+                                    {permissions.export && <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>}
+                                    {permissions.add && <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>}
                                 </div>
                             </div>
                         </CardHeader>
@@ -867,7 +871,9 @@ export default function PetitionsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                                        {loading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                                             const isSelected = selectedSet.has(item.renderId);
                                             return (
                                                 <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-slate-50 hover:bg-yellow-300 transition-all group", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
@@ -879,17 +885,36 @@ export default function PetitionsPage() {
                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger>
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem>
+                                                                    {permissions.edit && <DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem>}
+                                                                    {permissions.add && <DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem>}
+                                                                    {permissions.delete && (
+                                                                        <>
+                                                                            <DropdownMenuSeparator />
+                                                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem>
+                                                                        </>
+                                                                    )}
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={UserX}
+                                                title="Không tìm thấy đơn thư"
+                                                filters={{ ...filters, ...advancedFilters }}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setAdvancedFilters({
+                                                        date: format(new Date(), 'yyyy-MM-dd'), 
+                                                        buildings: []
+                                                    });
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>

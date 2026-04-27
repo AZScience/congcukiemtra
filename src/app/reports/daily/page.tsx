@@ -76,11 +76,12 @@ const ColumnHeader = ({ title, columnKey, icon: Icon, t, sortConfig, requestSort
                     <span className="truncate flex-1">{title}</span>
                     {sortState ? (
                         sortState.direction === 'ascending' 
-                            ? <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} /> 
-                            : <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} />
+                            ? <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> 
+                            : <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 shrink-0 opacity-30", isFiltered ? "text-red-300 opacity-100" : "group-hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 shrink-0 opacity-30", isFiltered ? "text-red-500 opacity-100" : "group-hover:opacity-100")} />
                     )}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-0 shadow-2xl border-gray-100" align="start">

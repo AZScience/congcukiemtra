@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { usePermissions } from "@/hooks/use-permissions";
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuSeparator, DropdownMenuCheckboxItem, 
@@ -41,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useLanguage } from "@/hooks/use-language";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'edit' | 'copy' | 'view';
 interface RenderGratitude extends AssetReception { renderId: string; }
@@ -419,15 +421,15 @@ const EditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSave, o
     </Dialog>
 );
 
-export default function GratitudeTab() {
+export default function GratitudeTab({ advancedFilters, setAdvancedFilters }: any) {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { user: authUser } = useUser();
     const { toast } = useToast();
+    const permissions = usePermissions('/monitoring/asset-check');
     const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
-    const [advancedFilters, setAdvancedFilters] = useState<any>({
-        date: format(new Date(), 'yyyy-MM-dd'), buildings: []
-    });
+    // advancedFilters lifted to parent
+
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<RenderGratitude | null>(null);
@@ -640,7 +642,7 @@ export default function GratitudeTab() {
                     <CardTitle className="text-lg flex items-center gap-2">Sổ Người tốt việc tốt</CardTitle>
                     <div className="flex items-center gap-2">
                         <TooltipProvider><Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>Bộ lọc nâng cao</p></TooltipContent></Tooltip></TooltipProvider>
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>Xuất file Excel</p></TooltipContent></Tooltip></TooltipProvider>
+                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600" disabled={!permissions.export}><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>Xuất file Excel</p></TooltipContent></Tooltip></TooltipProvider>
                     </div>
                 </div>
             </CardHeader>
@@ -651,7 +653,7 @@ export default function GratitudeTab() {
                             <TableRow className="bg-[#1877F2] hover:bg-[#1877F2]/90">
                                 <TableHead className="w-[80px] font-bold text-base text-white text-center border-r border-blue-300">#</TableHead>
                                 {orderedColumns.map(key => (<TableHead key={key} className="text-white border-r border-blue-300 p-0 h-auto"><ColumnHeader columnKey={key} title={columnDefs[key].title} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any)=>setSortConfig([{key:k, direction:d}])} clearSort={()=>setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} icon={colIcons[key]} /></TableHead>))}
-                                <TableHead className="w-16 text-center text-white font-bold text-base"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel><DropdownMenuSeparator />{allColumns.map(key => (<DropdownMenuCheckboxItem key={key} checked={columnVisibility[key]} onCheckedChange={v => setColumnVisibility(prev => ({...prev, [key]: !!v}))}>{t(columnDefs[key].title)}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu></TableHead>
+                                <TableHead className="w-16 text-center text-white font-bold text-base sticky right-0 bg-[#1877F2] z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel><DropdownMenuSeparator />{allColumns.map(key => (<DropdownMenuCheckboxItem key={key} checked={columnVisibility[key]} onCheckedChange={v => setColumnVisibility(prev => ({...prev, [key]: !!v}))}>{t(columnDefs[key].title)}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -667,7 +669,7 @@ export default function GratitudeTab() {
                                                 {String(item[key as keyof AssetReception] ?? '')}
                                             </TableCell>
                                         ))}
-                                        <TableCell className="text-center py-3">
+                                        <TableCell className="text-center py-3 sticky right-0 bg-white group-hover:bg-yellow-300 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]">
                                             <div onClick={e => e.stopPropagation()}>
                                                 <DropdownMenu modal={false}>
                                                     <DropdownMenuTrigger asChild>
@@ -677,10 +679,14 @@ export default function GratitudeTab() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                        {permissions.edit && <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>}
+                                                        {permissions.add && <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>}
+                                                        {permissions.delete && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                            </>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
@@ -688,7 +694,19 @@ export default function GratitudeTab() {
                                     </TableRow>
                                 );
                             }) : (
-                                <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Không có dữ liệu.</TableCell></TableRow>
+                                <DataTableEmptyState 
+                                    colSpan={orderedColumns.length + 2} 
+                                    icon={HeartHandshake}
+                                    title="Không tìm thấy ghi nhận tri ân"
+                                    filters={{ ...filters, ...advancedFilters }}
+                                    onClearFilters={() => {
+                                        setFilters({});
+                                        setAdvancedFilters({
+                                            date: format(new Date(), 'yyyy-MM-dd'),
+                                            buildings: []
+                                        });
+                                    }}
+                                />
                             )}
                         </TableBody>
                     </Table>

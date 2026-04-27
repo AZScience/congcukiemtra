@@ -66,8 +66,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import type { Employee, Role } from "@/lib/types";
-import { useUser, useFirestore, useDoc, useCollection } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const menuItems = [
   {
@@ -152,49 +151,48 @@ export const menuItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar();
   const { t } = useLanguage();
-  const { user: authUser } = useUser();
-  const firestore = useFirestore();
-
-  const employeeDocRef = React.useMemo(() => {
-    if (!firestore || !authUser) return null;
-    return doc(firestore, 'employees', authUser.uid);
-  }, [firestore, authUser]);
-  const { data: user } = useDoc<Employee>(employeeDocRef);
-
-  const rolesCollectionRef = React.useMemo(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'roles');
-  }, [firestore]);
-  const { data: allRoles } = useCollection<Role>(rolesCollectionRef);
-
-  const userRole = React.useMemo(() => {
-    if (!user || !allRoles) return null;
-    return allRoles.find(r => r.name === user.role);
-  }, [allRoles, user]);
-  
-  const userPermissions = React.useMemo(() => userRole?.permissions || {}, [userRole]);
+  const { user, userRole, hasPermission, isSuperAdmin, loading } = usePermissions();
 
   const filteredMenuItems = React.useMemo(() => {
-    if (!userRole || userRole.name === 'Hệ thống') return menuItems;
-
+    if (loading) return [];
+    
     return menuItems.map(item => {
       if (item.subItems) {
-        const filteredSubItems = item.subItems.filter(subItem => userPermissions[subItem.href]?.access !== false);
+        const filteredSubItems = item.subItems.filter(subItem => hasPermission(subItem.href, 'access'));
         if (filteredSubItems.length === 0) return null;
         return { ...item, subItems: filteredSubItems };
       }
       
-      if (userPermissions[item.href]?.access === false) {
+      if (!hasPermission(item.href, 'access')) {
         return null;
       }
       return item;
     }).filter(Boolean) as typeof menuItems;
-  }, [userPermissions, userRole]);
+  }, [hasPermission]);
   
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
 
+  // Auto-expand menu based on current path - only when pathname changes
+  const lastPathname = React.useRef(pathname);
+  React.useEffect(() => {
+    if (lastPathname.current !== pathname) {
+        lastPathname.current = pathname;
+        const activeMenu =
+          filteredMenuItems.find(
+            (item) =>
+              item.subItems &&
+              item.subItems.some((sub) => pathname.startsWith(sub.href))
+          )?.label || null;
+        
+        if (activeMenu) {
+            setOpenMenu(activeMenu);
+        }
+    }
+  }, [pathname, filteredMenuItems]);
+
+  // Initial expand on mount
   React.useEffect(() => {
     const activeMenu =
       filteredMenuItems.find(
@@ -202,12 +200,13 @@ export function SidebarNav() {
           item.subItems &&
           item.subItems.some((sub) => pathname.startsWith(sub.href))
       )?.label || null;
-    setOpenMenu(activeMenu);
-  }, [pathname, filteredMenuItems]);
+    if (activeMenu) setOpenMenu(activeMenu);
+  }, []); // Run once on mount
 
   const isSubItemActive = (subItems: any[]) => subItems.some(item => pathname.startsWith(item.href));
 
   const handleMenuToggle = (label: string) => {
+    if (!open) setOpen(true);
     setOpenMenu(prevMenu => (prevMenu === label ? null : label));
   };
 
@@ -275,18 +274,17 @@ export function SidebarNav() {
             </SidebarMenuItem>
         )
         )}
+        {loading && (
+            <div className="px-4 py-2 text-xs text-muted-foreground animate-pulse">
+                {t('Đang tải menu...')}
+            </div>
+        )}
     </SidebarMenu>
   );
 }
 
 export function UserFooter() {
-    const { user: authUser } = useUser();
-    const firestore = useFirestore();
-    const employeeDocRef = React.useMemo(() => {
-        if (!firestore || !authUser) return null;
-        return doc(firestore, 'employees', authUser.uid);
-    }, [firestore, authUser]);
-    const { data: user } = useDoc<Employee>(employeeDocRef);
+    const { user } = usePermissions();
     const { open } = useSidebar();
     
     return (

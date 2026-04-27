@@ -53,7 +53,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Employee, Role, Position as PositionType } from '@/lib/types';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderEmployee extends Employee { renderId: string; }
@@ -68,7 +70,8 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     {Icon && <Icon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />}
                     <span className="truncate">{t(title)}</span>
                     {sortState ? (
-                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} />) : <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "group-hover:opacity-100")} />}
+                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} />) : <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "group-hover:opacity-100")} />}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0" align="start">
@@ -364,7 +367,9 @@ export default function EmployeesPage() {
     positions: allPositions, 
     loadStates
   } = useMasterData();
-  const loading = loadStates.employees;
+  const { permissions, loading: permsLoading, error: permsError } = usePermissions('/personnel/employees');
+  const loading = permsLoading || loadStates.employees;
+  const error = permsError;
 
   const employees = useMemo(() => (rawEmployees || []).map((item, idx) => ({ ...item, renderId: `${item.id || 'no-id'}-${idx}` })) as RenderEmployee[], [rawEmployees]);
 
@@ -620,9 +625,18 @@ export default function EmployeesPage() {
                 <div className="flex items-center gap-2">
                   <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                   <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                  
+                  {permissions.import && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                  )}
+                  
+                  {permissions.export && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                  )}
+                  
+                  {permissions.add && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -652,7 +666,39 @@ export default function EmployeesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                    {loading ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                  <Cog className="h-8 w-8 animate-spin text-primary opacity-50" />
+                                  <p className="text-muted-foreground animate-pulse">{t('Đang tải dữ liệu...')}</p>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : error ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2 text-destructive">
+                                  <Ban className="h-8 w-8 opacity-50" />
+                                  <p className="font-bold">{t('Lỗi truy cập dữ liệu')}</p>
+                                  <p className="text-xs opacity-70">{error.message}</p>
+                                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2">
+                                      <Undo2 className="mr-2 h-4 w-4" /> {t('Thử lại')}
+                                  </Button>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : !permissions.view ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2 text-orange-500">
+                                  <Ban className="h-8 w-8 opacity-50" />
+                                  <p className="font-bold">{t('Hạn chế quyền truy cập')}</p>
+                                  <p className="text-sm opacity-70">{t('Bạn không có quyền xem dữ liệu trong danh mục này.')}</p>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                       const isSelected = selectedSet.has(item.renderId);
                       return (
                         <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/20 hover:bg-yellow-300 transition-all", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
@@ -673,7 +719,28 @@ export default function EmployeesPage() {
                           ))}
                           <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle">
                             <div onClick={e => e.stopPropagation()}>
-                              <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem>
+                                  
+                                  {permissions.edit && (
+                                    <>
+                                      <DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem>
+                                      <DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem>
+                                    </>
+                                  )}
+                                  
+                                  {permissions.delete && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}>
+                                        <Trash2 className="mr-2 h-4 w-4"/>Xóa
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </TableRow>

@@ -51,10 +51,10 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, sortConfig, openPopover, s
                     <span>{title}</span>
                     {sortState ? (
                         sortState.direction === 'asc' ?
-                            <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-yellow-300")} /> :
-                            <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-yellow-300")} />
+                            <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> :
+                            <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-yellow-300" : "hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "hover:opacity-100")} />
                     )}
                 </div>
             </PopoverTrigger>

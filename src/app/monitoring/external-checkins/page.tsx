@@ -36,6 +36,7 @@ import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { usePermissions } from "@/hooks/use-permissions";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 
 type DialogMode = 'view' | 'edit';
@@ -83,6 +84,7 @@ export default function ExternalCheckinsPage() {
     const { t } = useLanguage();
     const { toast } = useToast();
     const firestore = useFirestore();
+    const permissions = usePermissions('/monitoring/external-checkins');
 
     // Lấy dữ liệu từ collection external_checkins
     const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);
@@ -276,7 +278,7 @@ export default function ExternalCheckinsPage() {
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-semibold">{t('Danh sách Minh chứng Check-in')}</CardTitle>
                         <div className="flex items-center gap-2">
-                            {selectedRowIds.length > 0 && (
+                            {permissions.delete && selectedRowIds.length > 0 && (
                                 <Button variant="destructive" size="sm" onClick={() => handleDelete(selectedRowIds)}>
                                     <Trash2 className="mr-2 h-4 w-4" /> {t('Xóa')} ({selectedRowIds.length})
                                 </Button>

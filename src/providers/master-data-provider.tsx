@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useMemo } from 'react';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { 
     Student,
@@ -46,18 +46,20 @@ const MasterDataContext = createContext<MasterDataContextType | undefined>(undef
 
 export function MasterDataProvider({ children }: { children: React.ReactNode }) {
     const firestore = useFirestore();
+    const { user: authUser } = useUser();
+    const isAuthenticated = !!authUser;
 
     // Define collection references
-    const employeesRef = useMemo(() => (firestore ? collection(firestore, 'employees') : null), [firestore]);
-    const lecturersRef = useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]);
+    const employeesRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'employees') : null), [firestore, isAuthenticated]);
+    const lecturersRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'lecturers') : null), [firestore, isAuthenticated]);
     const departmentsRef = useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]);
     const roomsRef = useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]);
     const blocksRef = useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]);
     const recognitionsRef = useMemo(() => (firestore ? collection(firestore, 'recognitions') : null), [firestore]);
     const incidentCategoriesRef = useMemo(() => (firestore ? collection(firestore, 'incident-categories') : null), [firestore]);
-    const rolesRef = useMemo(() => (firestore ? collection(firestore, 'roles') : null), [firestore]);
-    const positionsRef = useMemo(() => (firestore ? collection(firestore, 'positions') : null), [firestore]);
-    const studentsRef = useMemo(() => (firestore ? collection(firestore, 'students') : null), [firestore]);
+    const rolesRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'roles') : null), [firestore, isAuthenticated]);
+    const positionsRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'positions') : null), [firestore, isAuthenticated]);
+    const studentsRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'students') : null), [firestore, isAuthenticated]);
 
     // Fetch data using useCollection hook
     const { data: employees, loading: empLoading } = useCollection<Employee>(employeesRef);

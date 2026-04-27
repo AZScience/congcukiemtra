@@ -104,73 +104,134 @@ export default function LoginPage() {
           setApiKeyError(true);
           return;
       }
+
+      const superAdminEmails = ['ngviphuc@gmail.com', 'nguyen.phuc@ntt.edu.vn', 'phucn@ntt.edu.vn'];
+      const normalizedEmail = values.email.toLowerCase().trim();
+      const isSuperAdmin = superAdminEmails.includes(normalizedEmail);
+
       try {
-        const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-        if (values.rememberMe) {
-          localStorage.setItem('rememberedEmail', values.email);
-        } else {
-          localStorage.removeItem('rememberedEmail');
-        }
-        await logActivity(userCredential.user.uid, 'login', 'System', `Người dùng ${values.email} đăng nhập thành công.`, { userEmail: values.email });
-        router.push('/dashboard');
-      } catch (signInError: any) {
-        // Modern Firebase returns 'auth/invalid-credential' for both wrong password and user-not-found
-        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
-          // Check if we should attempt auto-registration
-          // For security and clarity, we check if the user exists in our employees collection first
-          const employeesRef = collection(firestore, "employees");
-          const q = query(employeesRef, where("email", "==", values.email));
-          const querySnapshot = await getDocs(q);
+        // 1. Try to sign in first (this gives us authentication if they already have an account)
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
           
-          if (querySnapshot.empty) {
-            // No employee record found, this might be a completely new user OR a wrong email
-            // We can choose to show "Incorrect email/password" or attempt registration
-            // Following current logic: Attempt registration
+          // They are now authenticated. Let's verify they are in the employees list
+          if (!isSuperAdmin) {
+            const employeesRef = collection(firestore, "employees");
+            const q = query(employeesRef, where("email", "==", normalizedEmail));
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+              await auth.signOut();
+              toast({ 
+                  variant: "destructive", 
+                  title: "Truy cập bị từ chối", 
+                  description: "Email này không có trong danh sách nhân sự được cấp phép. Vui lòng liên hệ Quản trị viên." 
+              });
+              return;
+            }
+          }
+
+          if (values.rememberMe) {
+            localStorage.setItem('rememberedEmail', values.email);
+          } else {
+            localStorage.removeItem('rememberedEmail');
+          }
+          
+          await logActivity(userCredential.user.uid, 'login', 'System', `Người dùng ${values.email} đăng nhập thành công.`, { userEmail: values.email });
+          router.push('/dashboard');
+          
+        } catch (signInError: any) {
+          // 2. If sign in fails, check if we should attempt auto-registration
+          if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
             try {
-              const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-              const user = userCredential.user;
+              let employeeData: Employee | null = null;
+              let employeeDocId: string | null = null;
+
+              if (!isSuperAdmin) {
+                // To query 'employees', we must be authenticated. Sign in anonymously temporarily.
+                const { signInAnonymously } = await import("firebase/auth");
+                await signInAnonymously(auth);
+
+                const employeesRef = collection(firestore, "employees");
+                const q = query(employeesRef, where("email", "==", normalizedEmail));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                  await auth.signOut();
+                  toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Email hoặc mật khẩu không chính xác." });
+                  return;
+                }
+                employeeData = querySnapshot.docs[0].data() as Employee;
+                employeeDocId = querySnapshot.docs[0].id;
+              }
+
+              // Try to create the user account (this replaces the anonymous session)
+              const createCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+              const user = createCredential.user;
               
-              const newEmployeeDocRef = doc(firestore, "employees", user.uid);
-              const newEmployeeData: Employee = {
-                id: user.uid,
-                employeeId: `NTT-${Math.floor(10000 + Math.random() * 90000)}`,
-                email: user.email || '',
-                name: user.email?.split('@')[0] || "New User",
-                role: 'Nhân viên',
-                phone: '',
-                position: '',
-                nickname: '',
-                birthDate: '',
-                avatarUrl: '',
-                address: '',
-                note: '',
-              };
-              await setDoc(newEmployeeDocRef, newEmployeeData);
-              await logActivity(user.uid, 'login', 'System', `Người dùng ${values.email} đăng ký và đăng nhập lần đầu.`, { userEmail: values.email });
+              if (employeeData) {
+                // User exists in Firestore but not in Auth -> Initialize Auth linkage
+                const newEmployeeDocRef = doc(firestore, "employees", user.uid);
+                await setDoc(newEmployeeDocRef, {
+                  ...employeeData,
+                  id: user.uid,
+                  updatedAt: new Date().toISOString()
+                });
+                
+                if (employeeDocId !== user.uid) {
+                  const batch = writeBatch(firestore);
+                  batch.delete(doc(firestore, "employees", employeeDocId!));
+                  await batch.commit();
+                }
+                
+                toast({ title: "Kích hoạt tài khoản thành công", description: "Chào mừng bạn quay trở lại!" });
+              } else if (isSuperAdmin) {
+                // Super Admin not in employees -> Create a default entry for them
+                const newEmployeeDocRef = doc(firestore, "employees", user.uid);
+                const newAdminData: Employee = {
+                  id: user.uid,
+                  employeeId: `ADMIN-${Math.floor(1000 + Math.random() * 9000)}`,
+                  email: normalizedEmail,
+                  name: normalizedEmail.split('@')[0],
+                  role: 'Hệ thống',
+                  phone: '',
+                  position: 'Quản trị viên hệ thống',
+                  nickname: 'Admin',
+                  birthDate: '',
+                  avatarUrl: '',
+                  address: '',
+                  note: 'Tài khoản quản trị cấp cao',
+                };
+                await setDoc(newEmployeeDocRef, newAdminData);
+                toast({ title: "Kích hoạt tài khoản Quản trị", description: "Chào mừng bạn!" });
+              }
+              
+              await logActivity(user.uid, 'login', 'System', `Người dùng ${values.email} kích hoạt tài khoản thành công.`, { userEmail: values.email });
               
               if (values.rememberMe) localStorage.setItem('rememberedEmail', values.email);
               else localStorage.removeItem('rememberedEmail');
               
-              toast({ title: "Tạo tài khoản thành công", description: "Đang chuyển hướng đến trang tổng quan..." });
               router.push('/dashboard');
             } catch (createError: any) {
               if (createError.code === 'auth/email-already-in-use') {
                 toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Email hoặc mật khẩu không chính xác." });
+              } else if (createError.code === 'auth/weak-password') {
+                toast({ variant: "destructive", title: "Mật khẩu yếu", description: "Mật khẩu phải có ít nhất 6 ký tự." });
               } else {
-                toast({ variant: "destructive", title: "Lỗi", description: "Tài khoản không tồn tại hoặc thông tin không chính xác." });
+                toast({ variant: "destructive", title: "Lỗi", description: "Thông tin không chính xác hoặc lỗi hệ thống." });
               }
             }
-          } else {
-            // Employee exists in Firestore but couldn't sign in -> Wrong password
+          } else if (signInError.code === 'auth/wrong-password') {
             toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Email hoặc mật khẩu không chính xác." });
+          } else if (signInError.code === 'auth/too-many-requests') {
+            toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Tài khoản bị tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau." });
+          } else {
+            toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Đã xảy ra lỗi. Vui lòng thử lại sau." });
           }
-        } else if (signInError.code === 'auth/wrong-password') {
-          toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Email hoặc mật khẩu không chính xác." });
-        } else if (signInError.code === 'auth/too-many-requests') {
-          toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Tài khoản bị tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau hoặc đặt lại mật khẩu." });
-        } else {
-          toast({ variant: "destructive", title: "Lỗi đăng nhập", description: "Đã xảy ra lỗi. Vui lòng thử lại sau." });
         }
+      } catch (err: any) {
+        console.error("Login error:", err);
+        toast({ variant: "destructive", title: "Lỗi hệ thống", description: "Không thể kiểm tra thông tin nhân sự. Vui lòng thử lại sau." });
       }
     };
 

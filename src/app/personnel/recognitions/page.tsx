@@ -37,7 +37,9 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Recognition } from '@/lib/types';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderRec extends Recognition { renderId: string; }
@@ -127,6 +129,7 @@ export default function RecognitionsPage() {
 
     const recognitionsRef = useMemo(() => (firestore ? collection(firestore, 'recognitions') : null), [firestore]);
     const { data: rawData, loading } = useCollection<Recognition>(recognitionsRef);
+    const { permissions } = usePermissions('/personnel/recognitions') as any;
     const data = useMemo(() => (rawData || []).map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })), [rawData]);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -244,9 +247,18 @@ export default function RecognitionsPage() {
                                 <div className="flex items-center gap-2">
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    
+                                    {permissions.import && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.export && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.add && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    )}
                                 </div>
                             </div>
                         </CardHeader>
@@ -300,17 +312,38 @@ export default function RecognitionsPage() {
                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="hover:bg-muted text-primary"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-                                                                    <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                    
+                                                                    {permissions.edit && (
+                                                                        <>
+                                                                            <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+                                                                            <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>
+                                                                        </>
+                                                                    )}
+                                                                    
+                                                                    {permissions.delete && (
+                                                                        <>
+                                                                            <DropdownMenuSeparator />
+                                                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                        </>
+                                                                    )}
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={FilePenLine}
+                                                title={t('Không tìm thấy việc ghi nhận')}
+                                                filters={filters}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>

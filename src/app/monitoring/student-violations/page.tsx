@@ -18,12 +18,14 @@ import {
 import { logActivity } from "@/lib/activity-logger";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { usePermissions } from "@/hooks/use-permissions";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { SignaturePad } from "@/components/ui/signature-pad";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { useMasterData } from "@/providers/master-data-provider";
 import { collection, doc, setDoc, deleteDoc, writeBatch, query, orderBy, limit } from "firebase/firestore";
@@ -71,10 +73,11 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     {Icon && <Icon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />}
                     <span className="truncate">{t(title)}</span>
                     {sortState ? (
-                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-2 h-4 w-4", isFiltered && "text-yellow-300")} /> : <ArrowDown className={cn("ml-2 h-4 w-4", isFiltered && "text-yellow-300")} />
+                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-2 h-4 w-4", isFiltered && "text-red-500")} /> : <ArrowDown className={cn("ml-2 h-4 w-4", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-2 h-4 w-4", isFiltered ? "text-rose-500" : "opacity-50 group-hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-2 h-4 w-4", isFiltered ? "text-red-500" : "opacity-50 group-hover:opacity-100")} />
                     )}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0" align="start">
@@ -750,7 +753,12 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t, bloc
 };
 
 export default function StudentViolationsPage() {
-    const { t } = useLanguage(); const firestore = useFirestore(); const { user: authUser } = useUser(); const { toast } = useToast(); const { employees, students, lecturers, recognitions, incidentCategories } = useMasterData();
+    const { t } = useLanguage(); 
+    const firestore = useFirestore(); 
+    const { user: authUser } = useUser(); 
+    const { toast } = useToast(); 
+    const { employees, students, lecturers, recognitions, incidentCategories } = useMasterData();
+    const permissions = usePermissions('/monitoring/student-violations');
     const targetRecognition = useMemo(() => recognitions?.find(r => r.name === "Sinh viên vi phạm"), [recognitions]);
     const filteredIncidents = useMemo(() => { if (!incidentCategories) return []; const filtered = incidentCategories.filter(i => i.recognitionId === targetRecognition?.id); return filtered.length > 0 ? filtered : incidentCategories; }, [incidentCategories, targetRecognition]);
     const [refreshKey, setRefreshKey] = useState(0); const currentUserEmployee = useMemo(() => employees?.find(e => e.email === authUser?.email), [employees, authUser]);
@@ -893,10 +901,12 @@ export default function StudentViolationsPage() {
                                 <CardTitle className="text-xl flex items-center gap-2"><ShieldAlert className="h-6 w-6 text-rose-500" />Danh sách vi phạm</CardTitle>
                                 <div className="flex items-center gap-2">
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    {permissions.import && <>
+                                        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    </>}
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600" disabled={!permissions.export}><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary" disabled={!permissions.add}><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
                                 </div>
                             </div>
                         </CardHeader>
@@ -928,7 +938,9 @@ export default function StudentViolationsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {isViolationsLoading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Đang tải...</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => (
+                                        {isViolationsLoading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Đang tải...</TableCell></TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => (
                                             <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50 transition-all group" onClick={() => openDialog('view', item)}>
                                                 <TableCell className="font-medium text-center border-r align-middle py-3">{startIndex + idx + 1}</TableCell>
                                                 {orderedColumns.map(key => (
@@ -939,11 +951,41 @@ export default function StudentViolationsPage() {
                                                 <TableCell className="sticky right-0 z-10 bg-white group-hover:bg-muted/50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu modal={false}>
                                                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Cập nhật</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
+                                                            {permissions.edit && <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Chỉnh sửa</DropdownMenuItem>}
+                                                            {permissions.add && <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>}
+                                                            {permissions.delete && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
-                                        )) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">Không có dữ liệu.</TableCell></TableRow>}
+                                        )) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={ShieldAlert}
+                                                title="Không tìm thấy vi phạm của sinh viên"
+                                                filters={{ ...filters, ...advancedFilters }}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setAdvancedFilters({
+                                                        signed: '',
+                                                        fromDate: format(new Date(), 'yyyy-MM-dd'),
+                                                        toDate: format(new Date(), 'yyyy-MM-dd'),
+                                                        buildings: [],
+                                                        fullName: '',
+                                                        officers: [],
+                                                        studentId: ''
+                                                    });
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>

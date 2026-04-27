@@ -15,12 +15,14 @@ import {
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { usePermissions } from "@/hooks/use-permissions";
 import * as XLSX from 'xlsx';
 import { format, parse, isValid } from "date-fns";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { useMasterData } from "@/providers/master-data-provider";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
@@ -70,9 +72,10 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     {Icon && <Icon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />}
                     <span className="truncate">{t(title)}</span>
                     {sortState ? (
-                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} />
+                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "group-hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "group-hover:opacity-100")} />
+
                     )}
                 </Button>
             </PopoverTrigger>
@@ -555,6 +558,7 @@ export default function InPersonPage() {
         recognitions, 
         incidentCategories 
     } = useMasterData();
+    const permissions = usePermissions('/monitoring/in-person');
 
     const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
     const { data: schedulesData, loading: schedulesLoading } = useCollection<DailySchedule>(schedulesRef);
@@ -915,9 +919,9 @@ export default function InPersonPage() {
                                 <div className="flex items-center gap-2">
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
                                     <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx,.xls" />
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600" disabled={!permissions.add}><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600" disabled={!permissions.export}><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary" disabled={!permissions.add}><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
                                 </div>
                             </div>
                         </CardHeader>
@@ -942,7 +946,9 @@ export default function InPersonPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {(schedulesLoading && currentItems.length === 0) ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                                        {schedulesLoading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Đang tải...</TableCell></TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                                             const isSelected = selectedSet.has(item.renderId);
                                             const isHandled = item.recognitionDate && item.employee && item.incident;
                                             return (
@@ -979,10 +985,14 @@ export default function InPersonPage() {
                                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
-                                                                        <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Ghi nhận</DropdownMenuItem>
-                                                                        <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>
-                                                                        <DropdownMenuSeparator />
-                                                                        <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                        {permissions.edit && <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Ghi nhận</DropdownMenuItem>}
+                                                                        {permissions.add && <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>}
+                                                                        {permissions.delete && (
+                                                                            <>
+                                                                                <DropdownMenuSeparator />
+                                                                                <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                            </>
+                                                                        )}
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TooltipTrigger>
@@ -992,7 +1002,28 @@ export default function InPersonPage() {
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={MonitorCheck}
+                                                title="Không tìm thấy lịch học tại phòng"
+                                                filters={{ ...filters, ...advancedFilters }}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setAdvancedFilters({
+                                                        date: format(new Date(), 'yyyy-MM-dd'),
+                                                        buildings: [],
+                                                        departments: [],
+                                                        rooms: [],
+                                                        lecturers: [],
+                                                        periodSession: 'all',
+                                                        periodStart: '',
+                                                        periodEnd: ''
+                                                    });
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>

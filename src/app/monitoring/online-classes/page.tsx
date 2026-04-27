@@ -44,6 +44,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
+import { usePermissions } from "@/hooks/use-permissions";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 
 type DialogMode = 'view' | 'edit';
@@ -91,6 +92,7 @@ export default function OnlineClassesMonitoringPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { toast } = useToast();
+    const permissions = usePermissions('/monitoring/online-classes');
     const [searchTerm, setSearchTerm] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -305,7 +307,7 @@ export default function OnlineClassesMonitoringPage() {
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-bold text-blue-900 uppercase tracking-tight">Danh sách Giám sát Online</CardTitle>
                         <div className="flex items-center gap-4">
-                            {selectedIds.length > 0 && (
+                            {permissions.delete && selectedIds.length > 0 && (
                                 <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}><Trash2 className="h-4 w-4 mr-2" /> Xóa ({selectedIds.length})</Button>
                             )}
                             <div className="relative w-64">
@@ -332,7 +334,7 @@ export default function OnlineClassesMonitoringPage() {
                                                 <ColumnHeader columnKey={key} title={columnDefs[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={requestSort} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={handleFilterChange} icon={colIcons[key]} />
                                             </TableHead>
                                         ))}
-                                        <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400">
+                                        <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400 sticky right-0 bg-[#1877F2] z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
@@ -393,7 +395,7 @@ export default function OnlineClassesMonitoringPage() {
                                                     );
                                                     return <TableCell key={key} className="border-r border-slate-200 text-xs font-bold uppercase truncate max-w-[200px]" title={(item as any)[key]}>{(item as any)[key]}</TableCell>;
                                                 })}
-                                                <TableCell className="text-center p-2">
+                                                <TableCell className="text-center p-2 sticky right-0 bg-white group-hover:bg-yellow-300 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]">
                                                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                                         <Button variant="ghost" size="icon" onClick={() => openReviewDialog(item)} className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100"><Eye className="h-4 w-4" /></Button>
                                                     </TooltipTrigger><TooltipContent><p>{t('Xem & Duyệt')}</p></TooltipContent></Tooltip></TooltipProvider>

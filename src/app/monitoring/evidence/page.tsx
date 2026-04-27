@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useToast } from "@/hooks/use-toast";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 // --- Types ---
 
@@ -520,15 +521,19 @@ export default function EvidenceManagementPage() {
                         <p className="text-muted-foreground animate-pulse">Đang nạp dữ liệu minh chứng...</p>
                     </div>
                 ) : filteredEvidence.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border border-dashed border-slate-300">
-                        <div className="bg-slate-100 p-6 rounded-full mb-4">
-                            <ImageIcon className="h-12 w-12 text-slate-300" />
-                        </div>
-                        <p className="text-slate-500 font-medium text-lg">Không tìm thấy minh chứng nào phù hợp</p>
-                        <p className="text-slate-400 text-sm">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-                        <Button variant="link" onClick={() => { setSearchTerm(''); setFilterSource('all'); setFilterDate(''); }} className="mt-2">
-                            Xóa tất cả bộ lọc
-                        </Button>
+                    <div className="bg-white rounded-xl border border-dashed border-slate-300 overflow-hidden shadow-sm">
+                        <DataTableEmptyState 
+                            colSpan={1} 
+                            icon={ImageIcon}
+                            title="Không tìm thấy minh chứng nào phù hợp"
+                            filters={{ searchTerm, filterSource, filterDate }}
+                            onClearFilters={() => {
+                                setSearchTerm('');
+                                setFilterSource('all');
+                                setFilterDate('');
+                                setCurrentPage(1);
+                            }}
+                        />
                     </div>
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

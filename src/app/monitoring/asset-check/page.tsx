@@ -1,6 +1,8 @@
 
 'use client';
 
+import * as React from "react";
+import { useState } from "react";
 import PageHeader from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardPaste, Undo2, HeartHandshake } from "lucide-react";
@@ -8,9 +10,19 @@ import { ClientOnly } from "@/components/client-only";
 import ReceptionTab from "./_components/reception-tab";
 import ReturnTab from "./_components/return-tab";
 import GratitudeTab from "./_components/gratitude-tab";
+import { format } from "date-fns";
+
+
+import { useLocalStorage } from "@/hooks/use-local-storage";
 
 
 export default function AssetCheckPage() {
+    const [advancedFilters, setAdvancedFilters] = useLocalStorage<any>('asset_check_advanced_filters_v1', {
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        buildings: []
+    });
+
+
     return (
         <ClientOnly>
             <PageHeader
@@ -35,16 +47,26 @@ export default function AssetCheckPage() {
                         </TabsTrigger>
                     </TabsList>
                     <TabsContent value="reception">
-                        <ReceptionTab />
+                        <ReceptionTab 
+                            advancedFilters={advancedFilters} 
+                            setAdvancedFilters={setAdvancedFilters} 
+                        />
                     </TabsContent>
                     <TabsContent value="return">
-                        <ReturnTab />
+                        <ReturnTab 
+                            advancedFilters={advancedFilters} 
+                            setAdvancedFilters={setAdvancedFilters} 
+                        />
                     </TabsContent>
                     <TabsContent value="gratitude">
-                        <GratitudeTab />
+                        <GratitudeTab 
+                            advancedFilters={advancedFilters} 
+                            setAdvancedFilters={setAdvancedFilters} 
+                        />
                     </TabsContent>
                 </Tabs>
             </div>
         </ClientOnly>
     );
 }
+

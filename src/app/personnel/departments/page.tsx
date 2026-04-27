@@ -36,8 +36,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Department } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderDept extends Department { renderId: string; }
@@ -134,7 +136,12 @@ export default function DepartmentsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const deptsRef = useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]);
-    const { data: rawDepts, loading } = useCollection<Department>(deptsRef);
+    const { permissions, loading: permsLoading, error: permsError } = usePermissions('/personnel/departments');
+    const { data: rawDepts, loading: dataLoading, error: dataError } = useCollection<Department>(deptsRef);
+    
+    const loading = permsLoading || dataLoading;
+    const error = permsError || dataError;
+
     const data = useMemo(() => (rawDepts || []).map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })), [rawDepts]);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -271,9 +278,18 @@ export default function DepartmentsPage() {
                                 <div className="flex items-center gap-2">
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    
+                                    {permissions.import && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.export && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.add && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    )}
                                 </div>
                             </div>
                         </CardHeader>
@@ -303,20 +319,84 @@ export default function DepartmentsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
-                                            const isSelected = selectedSet.has(item.renderId);
-                                            return (
-                                                <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/20 hover:bg-yellow-300 transition-all", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
-                                                    <TableCell className="text-center border-r text-inherit align-middle py-3">{startIndex + idx + 1}</TableCell>
-                                                    {orderedColumns.map(k => <TableCell key={k} className="border-r text-inherit align-middle py-3">{String(item[k as keyof Department] || '')}</TableCell>)}
-                                                    <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle">
-                                                        <div onClick={e => e.stopPropagation()}>
-                                                            <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                                        </div>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                                                    <div className="flex flex-col items-center justify-center gap-2">
+                                                        <Cog className="h-8 w-8 animate-spin text-primary opacity-50" />
+                                                        <p className="text-muted-foreground animate-pulse">{t('Đang tải dữ liệu...')}</p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : error ? (
+                                            <TableRow>
+                                                <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                                                    <div className="flex flex-col items-center justify-center gap-2 text-destructive">
+                                                        <Ban className="h-8 w-8 opacity-50" />
+                                                        <p className="font-bold">{t('Lỗi truy cập dữ liệu')}</p>
+                                                        <p className="text-xs opacity-70">{error.message}</p>
+                                                        <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2">
+                                                            <Undo2 className="mr-2 h-4 w-4" /> {t('Thử lại')}
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : !permissions.view ? (
+                                            <TableRow>
+                                                <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                                                    <div className="flex flex-col items-center justify-center gap-2 text-orange-500">
+                                                        <Ban className="h-8 w-8 opacity-50" />
+                                                        <p className="font-bold">{t('Hạn chế quyền truy cập')}</p>
+                                                        <p className="text-sm opacity-70">{t('Bạn không có quyền xem dữ liệu trong danh mục này.')}</p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => (
+                                            <TableRow 
+                                                key={item.renderId} 
+                                                className={cn("cursor-pointer transition-colors hover:bg-slate-50", selectedSet.has(item.renderId) && "bg-blue-50/50")}
+                                                onClick={() => handleRowClick(item.renderId)}
+                                            >
+                                                <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
+                                                {orderedColumns.map(columnKey => (
+                                                    <TableCell key={columnKey} className="border-r max-w-[300px]">
+                                                        {columnKey === 'name' ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                                                    <Landmark className="h-4 w-4" />
+                                                                </div>
+                                                                <span className="font-bold text-slate-800">{item.name}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-600 line-clamp-2">{(item as any)[columnKey] || '---'}</span>
+                                                        )}
                                                     </TableCell>
-                                                </TableRow>
-                                            );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                                ))}
+                                                <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l p-0 text-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('view', item); }}><Eye className="mr-2 h-4 w-4" /> Xem chi tiết</DropdownMenuItem>
+                                                            {permissions.edit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('edit', item); }}><Edit className="mr-2 h-4 w-4" /> Chỉnh sửa</DropdownMenuItem>}
+                                                            {permissions.add && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('copy', item); }}><Copy className="mr-2 h-4 w-4" /> Nhân bản</DropdownMenuItem>}
+                                                            {permissions.delete && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Xoá</DropdownMenuItem>}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={Landmark}
+                                                title={t('Không tìm thấy đơn vị')}
+                                                filters={filters}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
+
                                     </TableBody>
                                 </Table>
                             </div>

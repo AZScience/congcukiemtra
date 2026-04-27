@@ -573,8 +573,10 @@ export default function RolesPage() {
                                         </Button>
                                     </div>
 
-                                    <div className="border rounded-md overflow-hidden">
-                                        <Table>
+                                    <div className="border rounded-md overflow-x-auto">
+                                        <div className="min-w-[800px]">
+                                            <Table>
+
                                             <TableHeader className="bg-slate-100 sticky top-0 z-10">
                                                 <TableRow>
                                                     <TableHead className="font-bold text-black border-r border-slate-300 bg-slate-200">Chức năng (Module)</TableHead>
@@ -658,7 +660,9 @@ export default function RolesPage() {
                                     </div>
                                 </div>
                             </div>
-                        </ScrollArea>
+                        </div>
+                    </ScrollArea>
+
                         
                         <div className="p-4 border-t bg-slate-50 flex justify-end gap-3 mt-auto">
                             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy bỏ</Button>
