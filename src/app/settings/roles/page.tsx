@@ -15,7 +15,7 @@ import {
   FileQuestion, FileText, CalendarDays, BarChart3, Heart,
   FileStack, AlertCircle, Calendar, Settings2, Key, History,
   QrCode, MonitorPlay, MessageSquareQuote, Bot, MessagesSquare, Mail,
-  IdCard, FileType
+  IdCard, FileType, Camera
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -48,6 +48,9 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import type { Role, Permissions } from '@/lib/types';
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS, ADMIN_PERMISSIONS, LECTURER_PERMISSIONS, ADVISOR_PERMISSIONS } from '@/lib/permissions-defaults';
+import { LayoutGrid, CheckSquare } from 'lucide-react';
+
 
 const MODULE_CATEGORIES = [
     {
@@ -111,7 +114,9 @@ const MODULE_CATEGORIES = [
         modules: [
             { id: '/monitoring/external-checkins', label: 'Giám sát thực hành', icon: QrCode },
             { id: '/monitoring/online-classes', label: 'Giám sát Online', icon: MonitorPlay },
+            { id: '/lecturer-portal', label: 'Portal Giảng viên', icon: GraduationCap },
             { id: '/feedback', label: 'Minh chứng ca trực', icon: MessageSquareQuote },
+            { id: '/monitoring/evidence', label: 'Kho minh chứng', icon: Camera },
             { id: '/ai/assistant', label: 'Tra cứu thông tin (AI)', icon: Bot },
             { id: '/discussion', label: 'Bảng thảo luận', icon: MessagesSquare },
             { id: '/messaging', label: 'Hộp thư nội bộ', icon: Mail }
@@ -559,7 +564,53 @@ export default function RolesPage() {
                                             placeholder="Nhập mô tả cho vai trò này"
                                         />
                                     </div>
+                                    <div className="md:col-span-2 flex flex-wrap gap-2 items-center bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                                        <Label className="text-xs font-bold text-blue-700 uppercase flex items-center gap-2 mr-2">
+                                            <LayoutGrid className="h-3.5 w-3.5" /> Áp dụng mẫu nhanh:
+                                        </Label>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: ADMIN_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5 text-red-500" /> Mẫu Quản trị
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: STAFF_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Nhân viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: CONTROLLER_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Kiểm soát viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: LECTURER_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Giảng viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: ADVISOR_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Cố vấn HT
+                                        </Button>
+                                    </div>
                                 </div>
+
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -573,8 +624,10 @@ export default function RolesPage() {
                                         </Button>
                                     </div>
 
-                                    <div className="border rounded-md overflow-hidden">
-                                        <Table>
+                                    <div className="border rounded-md overflow-x-auto">
+                                        <div className="min-w-[800px]">
+                                            <Table>
+
                                             <TableHeader className="bg-slate-100 sticky top-0 z-10">
                                                 <TableRow>
                                                     <TableHead className="font-bold text-black border-r border-slate-300 bg-slate-200">Chức năng (Module)</TableHead>
@@ -658,7 +711,9 @@ export default function RolesPage() {
                                     </div>
                                 </div>
                             </div>
-                        </ScrollArea>
+                        </div>
+                    </ScrollArea>
+
                         
                         <div className="p-4 border-t bg-slate-50 flex justify-end gap-3 mt-auto">
                             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy bỏ</Button>

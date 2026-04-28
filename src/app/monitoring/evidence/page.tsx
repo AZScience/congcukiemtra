@@ -22,7 +22,8 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
-import { collection, doc, updateDoc, deleteField } from "firebase/firestore";
+import { usePermissions } from "@/hooks/use-permissions";
+import { collection, doc, updateDoc, deleteField, query, orderBy, limit } from "firebase/firestore";
 import { useMasterData } from "@/providers/master-data-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useToast } from "@/hooks/use-toast";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 // --- Types ---
 
@@ -55,14 +57,15 @@ export default function EvidenceManagementPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { employees } = useMasterData();
+    const { permissions } = usePermissions('/monitoring/evidence');
 
-    // --- Collections ---
-    const schedulesRef = useMemo(() => firestore ? collection(firestore, 'schedules') : null, [firestore]);
-    const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);
-    const requestsRef = useMemo(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
-    const petitionsRef = useMemo(() => firestore ? collection(firestore, 'petitions') : null, [firestore]);
-    const assetRef = useMemo(() => firestore ? collection(firestore, 'asset-receptions') : null, [firestore]);
-    const violationsRef = useMemo(() => firestore ? collection(firestore, 'student-violations') : null, [firestore]);
+    // --- Collections Optimized ---
+    const schedulesRef = useMemo(() => firestore ? query(collection(firestore, 'schedules'), orderBy('date', 'desc'), limit(100)) : null, [firestore]);
+    const checkinsRef = useMemo(() => firestore ? query(collection(firestore, 'external_checkins'), orderBy('timestamp', 'desc'), limit(50)) : null, [firestore]);
+    const requestsRef = useMemo(() => firestore ? query(collection(firestore, 'requests'), orderBy('requestDate', 'desc'), limit(50)) : null, [firestore]);
+    const petitionsRef = useMemo(() => firestore ? query(collection(firestore, 'petitions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const assetRef = useMemo(() => firestore ? query(collection(firestore, 'asset-receptions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const violationsRef = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), orderBy('violationDate', 'desc'), limit(50)) : null, [firestore]);
 
     const { data: schedulesData, loading: loadingSchedules } = useCollection<any>(schedulesRef);
     const { data: checkinsData, loading: loadingCheckins } = useCollection<any>(checkinsRef);
@@ -520,15 +523,19 @@ export default function EvidenceManagementPage() {
                         <p className="text-muted-foreground animate-pulse">Đang nạp dữ liệu minh chứng...</p>
                     </div>
                 ) : filteredEvidence.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border border-dashed border-slate-300">
-                        <div className="bg-slate-100 p-6 rounded-full mb-4">
-                            <ImageIcon className="h-12 w-12 text-slate-300" />
-                        </div>
-                        <p className="text-slate-500 font-medium text-lg">Không tìm thấy minh chứng nào phù hợp</p>
-                        <p className="text-slate-400 text-sm">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-                        <Button variant="link" onClick={() => { setSearchTerm(''); setFilterSource('all'); setFilterDate(''); }} className="mt-2">
-                            Xóa tất cả bộ lọc
-                        </Button>
+                    <div className="bg-white rounded-xl border border-dashed border-slate-300 overflow-hidden shadow-sm">
+                        <DataTableEmptyState 
+                            colSpan={1} 
+                            icon={ImageIcon}
+                            title="Không tìm thấy minh chứng nào phù hợp"
+                            filters={{ searchTerm, filterSource, filterDate }}
+                            onClearFilters={() => {
+                                setSearchTerm('');
+                                setFilterSource('all');
+                                setFilterDate('');
+                                setCurrentPage(1);
+                            }}
+                        />
                     </div>
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -587,14 +594,16 @@ export default function EvidenceManagementPage() {
                                             <span className="text-[10px] font-medium">{item.submittedByName}</span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {permissions.delete && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                             <div className="flex items-center gap-1.5 text-slate-400 ml-1">
                                                 <Clock className="h-3 w-3" />
                                                 <span className="text-[10px] font-medium">{item.dateStr}</span>
@@ -615,7 +624,7 @@ export default function EvidenceManagementPage() {
                                     <TableHead>Đối tượng / Nội dung</TableHead>
                                     <TableHead className="w-[150px]">Người cập nhật</TableHead>
                                     <TableHead className="w-[120px]">Ngày</TableHead>
-                                    <TableHead className="w-[120px] text-right">Tác vụ</TableHead>
+                                    <TableHead className="w-[120px] text-right sticky right-0 z-20 bg-slate-50 shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400">Tác vụ</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -662,19 +671,21 @@ export default function EvidenceManagementPage() {
                                         </TableCell>
                                         <TableCell className="text-xs font-medium text-slate-600">{item.submittedByName}</TableCell>
                                         <TableCell className="text-xs text-slate-500">{item.dateStr}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right sticky right-0 z-10 bg-white group-hover:bg-blue-50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100">
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {permissions.delete && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

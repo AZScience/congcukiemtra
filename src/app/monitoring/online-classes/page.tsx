@@ -6,12 +6,13 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { 
   Video, Users, Clock, ExternalLink, 
   Search, Filter, Calendar as CalendarIcon,
   CheckCircle2, AlertCircle, Laptop, Camera,
-  Trash2, Eye, ChevronLeft, ChevronRight,
+  Trash2, Eye, Edit, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   ChevronsLeft, ChevronsRight, Cog, X,
   ArrowUpDown, ArrowUp, ArrowDown, EllipsisVertical,
   Save, Undo2, MapPin, Hash, GraduationCap, User, FileText, BookOpen
@@ -44,6 +45,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
+import { usePermissions } from "@/hooks/use-permissions";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 
 type DialogMode = 'view' | 'edit';
@@ -91,6 +93,7 @@ export default function OnlineClassesMonitoringPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { toast } = useToast();
+    const { permissions } = usePermissions('/monitoring/online-classes');
     const [searchTerm, setSearchTerm] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -197,23 +200,51 @@ export default function OnlineClassesMonitoringPage() {
     const currentItems = sortedItems.slice(startIndex, startIndex + Number(rowsPerPage));
 
     // Approval logic
+    const [dialogMode, setDialogMode] = useState<DialogMode>('view');
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+    const [isDetailCollapsed, setIsDetailCollapsed] = useState(true);
     const [reviewStatus, setReviewStatus] = useState<string>('pending_review');
+    const [reviewStudentCount, setReviewStudentCount] = useState<number | string>('');
+    const [reviewIncident, setReviewIncident] = useState<string>('');
+    const [reviewIncidentDetail, setReviewIncidentDetail] = useState<string>('');
 
-    const openReviewDialog = (item: any) => {
+    const openReviewDialog = (mode: DialogMode, item: any) => {
+        setDialogMode(mode);
         setSelectedItem(item);
+        setIsDetailCollapsed(true);
         setReviewStatus(item.status || 'pending_review');
+        setReviewStudentCount(item.studentCount ?? item.actualStudentCount ?? '');
+        setReviewIncident(item.incident || '');
+        setReviewIncidentDetail(item.incidentDetail || '');
         setIsReviewDialogOpen(true);
     };
 
     const handleSaveReview = async () => {
-        if (!firestore || !selectedItem) return;
+        if (!firestore || !selectedItem || dialogMode === 'view') return;
         try {
-            await setDoc(doc(firestore, "online_checkins", selectedItem.id), { status: reviewStatus }, { merge: true });
+            const updateData = { 
+                status: reviewStatus,
+                studentCount: Number(reviewStudentCount),
+                incident: reviewIncident,
+                incidentDetail: reviewIncidentDetail
+            };
+            
+            await setDoc(doc(firestore, "online_checkins", selectedItem.id), updateData, { merge: true });
 
             if (reviewStatus === 'approved') {
                 const schedulesRef = collection(firestore, 'schedules');
+                
+                // Lấy thông tin nhân viên từ localStorage nếu có
+                let currentUser = 'Hệ thống (Duyệt Online)';
+                try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                        const user = JSON.parse(userStr);
+                        if (user.displayName || user.fullName) currentUser = user.displayName || user.fullName;
+                    }
+                } catch (e) {}
+
                 // Sync to schedules
                 const q = query(
                     schedulesRef, 
@@ -226,10 +257,10 @@ export default function OnlineClassesMonitoringPage() {
                     const scheduleDoc = querySnapshot.docs[0];
                     await updateDoc(doc(firestore, 'schedules', scheduleDoc.id), {
                         recognitionDate: format(new Date(), 'yyyy-MM-dd'),
-                        employee: 'Hệ thống (Duyệt Online)',
-                        incident: selectedItem.incident || '',
-                        incidentDetail: selectedItem.incidentDetail || '',
-                        actualStudentCount: selectedItem.studentCount || '',
+                        employee: currentUser,
+                        incident: reviewIncident || '',
+                        incidentDetail: reviewIncidentDetail || '',
+                        actualStudentCount: reviewStudentCount || '',
                         evidence: selectedItem.evidence || '',
                         note: `Đã duyệt từ Giám sát Online. Link: ${selectedItem.meetingLink || 'N/A'}`
                     });
@@ -305,7 +336,7 @@ export default function OnlineClassesMonitoringPage() {
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-lg font-bold text-blue-900 uppercase tracking-tight">Danh sách Giám sát Online</CardTitle>
                         <div className="flex items-center gap-4">
-                            {selectedIds.length > 0 && (
+                            {permissions.delete && selectedIds.length > 0 && (
                                 <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}><Trash2 className="h-4 w-4 mr-2" /> Xóa ({selectedIds.length})</Button>
                             )}
                             <div className="relative w-64">
@@ -332,7 +363,7 @@ export default function OnlineClassesMonitoringPage() {
                                                 <ColumnHeader columnKey={key} title={columnDefs[key]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={requestSort} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={handleFilterChange} icon={colIcons[key]} />
                                             </TableHead>
                                         ))}
-                                        <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400">
+                                        <TableHead className="w-[100px] text-center text-white font-bold border-l border-blue-400 sticky right-0 bg-[#1877F2] z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
@@ -393,10 +424,30 @@ export default function OnlineClassesMonitoringPage() {
                                                     );
                                                     return <TableCell key={key} className="border-r border-slate-200 text-xs font-bold uppercase truncate max-w-[200px]" title={(item as any)[key]}>{(item as any)[key]}</TableCell>;
                                                 })}
-                                                <TableCell className="text-center p-2">
-                                                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                                        <Button variant="ghost" size="icon" onClick={() => openReviewDialog(item)} className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100"><Eye className="h-4 w-4" /></Button>
-                                                    </TooltipTrigger><TooltipContent><p>{t('Xem & Duyệt')}</p></TooltipContent></Tooltip></TooltipProvider>
+                                                <TableCell className="text-center p-1 sticky right-0 bg-white group-hover:bg-yellow-300 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-100 text-blue-600">
+                                                                <EllipsisVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-40">
+                                                            <DropdownMenuItem onClick={() => openReviewDialog('view', item)} className="cursor-pointer">
+                                                                <Eye className="mr-2 h-4 w-4 text-blue-600" /> {t('Xem chi tiết')}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => openReviewDialog('edit', item)} className="cursor-pointer text-orange-600 focus:text-orange-600">
+                                                                <Edit className="mr-2 h-4 w-4" /> {t('Ghi nhận')}
+                                                            </DropdownMenuItem>
+                                                            {permissions.delete && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onClick={() => { setSelectedIds([item.id]); setShowDeleteConfirm(true); }} className="cursor-pointer text-red-600 focus:text-red-600">
+                                                                        <Trash2 className="mr-2 h-4 w-4" /> {t('Xóa')}
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -427,11 +478,11 @@ export default function OnlineClassesMonitoringPage() {
                     </CardContent>
                 </Card>
 
-                {/* Review Dialog */}
+                {/* Ghi nhận & Duyệt Dialog */}
                 <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
                     <DialogContent className="sm:max-w-2xl bg-slate-50">
                         <DialogHeader>
-                            <DialogTitle className="text-xl text-blue-800 flex items-center gap-2"><Laptop className="h-5 w-5" /> Duyệt minh chứng Online</DialogTitle>
+                            <DialogTitle className="text-xl text-blue-800 flex items-center gap-2"><Laptop className="h-5 w-5" /> Ghi nhận Giám sát Online</DialogTitle>
                             <VisuallyHidden><DialogDescription>Chi tiết giám sát</DialogDescription></VisuallyHidden>
                         </DialogHeader>
                         {selectedItem && (
@@ -440,19 +491,73 @@ export default function OnlineClassesMonitoringPage() {
                                     <div><p className="text-[10px] font-bold text-slate-400 uppercase">Giảng viên</p><p className="font-bold text-blue-700">{selectedItem.lecturer}</p></div>
                                     <div><p className="text-[10px] font-bold text-slate-400 uppercase">Lớp / Môn học</p><p className="font-bold">{selectedItem.classId} - {selectedItem.className}</p></div>
                                     <div><p className="text-[10px] font-bold text-slate-400 uppercase">Tiết học</p><p className="font-bold">{selectedItem.period}</p></div>
-                                    <div><p className="text-[10px] font-bold text-slate-400 uppercase">Sĩ số / Tham gia</p><p className="font-bold text-green-600">{selectedItem.totalStudents} / {selectedItem.studentCount}</p></div>
+                                    <div><p className="text-[10px] font-bold text-slate-400 uppercase">Sĩ số hệ thống</p><p className="font-bold text-slate-600">{selectedItem.totalStudents}</p></div>
                                     <div className="col-span-2"><p className="text-[10px] font-bold text-slate-400 uppercase">Link cuộc họp</p><a href={selectedItem.meetingLink} target="_blank" className="text-blue-500 hover:underline text-xs break-all">{selectedItem.meetingLink || 'N/A'}</a></div>
                                 </div>
-                                <div className="space-y-2">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase px-1">Hình ảnh minh chứng</p>
-                                    {selectedItem.evidence ? (
-                                        <div className="rounded-lg border overflow-hidden bg-black flex justify-center"><img src={selectedItem.evidence} className="max-h-60 object-contain" alt="Evidence" /></div>
-                                    ) : <div className="h-32 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 italic">Không có hình ảnh</div>}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-600 uppercase">SV tham gia thực tế</Label>
+                                        <Input type="number" value={reviewStudentCount} onChange={(e) => setReviewStudentCount(e.target.value)} disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold text-slate-600 uppercase">Việc phát sinh</Label>
+                                        <Input value={reviewIncident} onChange={(e) => setReviewIncident(e.target.value)} placeholder="Nhập sự cố nếu có..." disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500" />
+                                    </div>
+                                    <div className="col-span-full space-y-2">
+                                        <Label className="text-xs font-bold text-slate-600 uppercase">Chi tiết sự việc</Label>
+                                        <Input value={reviewIncidentDetail} onChange={(e) => setReviewIncidentDetail(e.target.value)} placeholder="Mô tả chi tiết..." disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500" />
+                                    </div>
                                 </div>
+
+                                {/* Minh chứng - Collapsible Group */}
+                                <div className={cn("border rounded-lg overflow-hidden transition-all duration-300", 
+                                    isDetailCollapsed ? "bg-slate-100/50 border-slate-200" : "bg-white border-blue-200 shadow-md")}>
+                                    <div 
+                                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 transition-colors"
+                                        onClick={() => setIsDetailCollapsed(!isDetailCollapsed)}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <div className={cn("p-1.5 rounded-full", isDetailCollapsed ? "bg-slate-200" : "bg-blue-100 text-blue-600")}>
+                                                <Camera className="h-4 w-4" />
+                                            </div>
+                                            <span className={cn("font-bold text-sm", isDetailCollapsed ? "text-slate-600" : "text-blue-700")}>
+                                                Hình ảnh minh chứng Online
+                                            </span>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="h-8 px-2">
+                                            {isDetailCollapsed ? (
+                                                <><span className="text-xs mr-1">Xem ảnh</span> <ChevronDown className="h-4 w-4" /></>
+                                            ) : (
+                                                <><span className="text-xs mr-1">Thu gọn</span> <ChevronUp className="h-4 w-4" /></>
+                                            )}
+                                        </Button>
+                                    </div>
+                                    
+                                    {!isDetailCollapsed && (
+                                        <div className="p-4 pt-0 animate-in slide-in-from-top-2 duration-300">
+                                            <Separator className="bg-blue-100 mb-4" />
+                                            {selectedItem.evidence ? (
+                                                <div className="rounded-lg border overflow-hidden bg-black flex justify-center group relative cursor-zoom-in" onClick={() => { const win = window.open(); win?.document.write(`<img src="${selectedItem.evidence}" style="width:100%">`); }}>
+                                                    <img src={selectedItem.evidence} className="max-h-64 object-contain" alt="Evidence" />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                                        <Eye className="text-white h-8 w-8" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="h-32 bg-slate-50 border border-dashed rounded-lg flex flex-col items-center justify-center text-slate-400 italic text-xs gap-2">
+                                                    <Camera className="h-8 w-8 opacity-20" />
+                                                    Không có hình ảnh minh chứng
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                                     <p className="text-[10px] font-bold text-amber-700 uppercase mb-2">Quyết định phê duyệt</p>
-                                    <Select value={reviewStatus} onValueChange={setReviewStatus}>
-                                        <SelectTrigger className="bg-white"><SelectValue placeholder="Chọn trạng thái..." /></SelectTrigger>
+                                    <Select value={reviewStatus} onValueChange={setReviewStatus} disabled={dialogMode === 'view'}>
+                                        <SelectTrigger className="bg-white border-amber-300"><SelectValue placeholder="Chọn trạng thái..." /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="pending_review">Chờ duyệt</SelectItem>
                                             <SelectItem value="approved">Chấp nhận & Đồng bộ</SelectItem>
@@ -464,7 +569,7 @@ export default function OnlineClassesMonitoringPage() {
                         )}
                         <DialogFooter className="border-t pt-4">
                             <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>Hủy bỏ</Button>
-                            <Button onClick={handleSaveReview} className="bg-blue-600 hover:bg-blue-700"><Save className="mr-2 h-4 w-4" /> Lưu & Hoàn tất</Button>
+                            {dialogMode === 'edit' && <Button onClick={handleSaveReview} className="bg-blue-600 hover:bg-blue-700"><Save className="mr-2 h-4 w-4" /> Lưu & Hoàn tất</Button>}
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

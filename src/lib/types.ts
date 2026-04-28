@@ -21,6 +21,7 @@ export type Student = {
   parentPhone?: string; // ĐT Phụ huynh
   phone: string; // Điện thoại
   email: string; // Email
+  identifier?: string; // Mã định danh (CCCD hoặc MSSV)
   note?: string; // Ghi chú
 };
 

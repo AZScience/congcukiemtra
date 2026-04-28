@@ -10,7 +10,8 @@ import {
   ArrowDown, X, EllipsisVertical, Save, CalendarCog, CalendarDays, 
   Undo2, Eye, FileUp, FileDown, CheckCircle2, ListFilter, Check, 
   ChevronsUpDown, Clock, Filter, Ban, Copy, Landmark, DoorOpen,
-  Library, Users, Activity, Hash, GraduationCap, FileText, StickyNote, CheckSquare, CloudUpload, CloudDownload, ShieldAlert
+  Library, Users, Activity, Hash, GraduationCap, FileText, StickyNote, CheckSquare, CloudUpload, CloudDownload, ShieldAlert,
+  Loader2
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from '@/hooks/use-local-storage';
@@ -27,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { format, parse, isValid } from "date-fns";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
+import type ExcelJS from 'exceljs';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
@@ -70,11 +72,12 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     <span className="truncate flex-1 text-left">{t(title)}</span>
                     {sortState ? (
                         sortState.direction === 'ascending' ? 
-                        <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} /> : 
-                        <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} />
+                        <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> : 
+                        <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "hover:opacity-100")} />
                     )}
+
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0 shadow-2xl border-blue-100" align="start">
@@ -222,7 +225,7 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, blockOp
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-4xl">
                 <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8">
+                    <div className="flex items-center justify-between pr-12">
                         <DialogTitle className="flex items-center gap-2">
                             <ListFilter className="h-5 w-5 text-primary" />
                             Bộ lọc nâng cao
@@ -520,6 +523,9 @@ export default function SchedulePage() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [isExporting, setIsExporting] = useState(false);
+    const templateCache = useRef<ArrayBuffer | null>(null);
 
     // Memoize references
     const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
@@ -936,9 +942,176 @@ export default function SchedulePage() {
         toast({ title: t("Thành công"), description: `Đã xóa ${rowsToDelete.length} bản ghi ngày ${targetDate}.` });
     };
 
-    const handleExport = () => {
-        const ws = XLSX.utils.json_to_sheet(sortedItems); const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Schedules"); XLSX.writeFile(wb, `LichHoc_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    const handleExport = async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+        
+        const ExcelJS = (await import('exceljs')).default;
+        const loadingToast = toast({ title: "Đang xử lý", description: "Hệ thống đang chuẩn bị lịch học Excel..." });
+        
+        try {
+            // Chuẩn hóa chuỗi để so sánh không dấu, không hoa thường
+            const normalizeSearch = (s: string) => {
+                return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            };
+
+            // Lấy ngày đang chọn từ bộ lọc (nếu có)
+            let targetDate = "";
+            if (advancedFilters.date) {
+                if (advancedFilters.date.includes('-')) {
+                    const [y, m, d] = advancedFilters.date.split('-');
+                    targetDate = `${d}/${m}/${y}`;
+                } else {
+                    targetDate = advancedFilters.date;
+                }
+            }
+
+            // Ưu tiên lấy toàn bộ dữ liệu của ngày đang lọc để tránh bị sót do bộ lọc Dãy nhà ở UI
+            const baseData = targetDate ? data.filter(s => s.date === targetDate) : sortedItems;
+
+            if (!baseData || baseData.length === 0) {
+                toast({ title: "Thông báo", description: "Không có dữ liệu để xuất.", variant: "destructive" });
+                setIsExporting(false);
+                return;
+            }
+
+            const isOnline = (b: string) => {
+                const s = normalizeSearch(b);
+                return s.includes("online") || s.includes("truc tuyen");
+            };
+            
+            const isExam = (s: string) => {
+                const status = normalizeSearch(s);
+                return status.includes("thi");
+            };
+
+            const examData = baseData.filter(s => isExam(s.status));
+            const onlineData = baseData.filter(s => isOnline(s.building) && !isExam(s.status));
+            const inPersonData = baseData.filter(s => !isOnline(s.building) && !isExam(s.status));
+            
+            toast({ 
+                title: "KẾT QUẢ PHÂN LOẠI", 
+                description: `Trực tiếp: ${inPersonData.length}, Thi: ${examData.length}, Online: ${onlineData.length}`,
+                duration: 10000 
+            });
+
+            const categories = [
+                { key: "LOPTRUCTIEP", data: inPersonData },
+                { key: "LOPTHI", data: examData },
+                { key: "LOPONLINE", data: onlineData }
+            ];
+
+            let arrayBuffer = templateCache.current;
+            if (!arrayBuffer) {
+                const response = await fetch('/templates/daily_schedule_template.xlsx');
+                if (!response.ok) throw new Error("Không thể tải tệp mẫu daily_schedule_template.xlsx");
+                arrayBuffer = await response.arrayBuffer();
+                templateCache.current = arrayBuffer;
+            }
+
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+
+            const normalizeName = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').trim();
+            
+            const getSheet = (key: string): ExcelJS.Worksheet | undefined => {
+                const normalizedKey = normalizeName(key);
+                let ws = workbook.worksheets.find(w => normalizeName(w.name).includes(normalizedKey)) ||
+                         workbook.worksheets.find(w => normalizedKey.includes(normalizeName(w.name)));
+                
+                if (!ws) {
+                    if (key === "LOPTRUCTIEP") return getSheet("PHONGHOC") || getSheet("TRUCTIEP");
+                    if (key === "LOPONLINE") return getSheet("TRUCTUYEN") || getSheet("ONLINE");
+                    if (key === "LOPTHI") return getSheet("THI") || getSheet("EXAM");
+                }
+                return ws;
+            };
+
+            const columns = ['date', 'building', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'lecturer', 'content', 'status', 'note'];
+            const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+
+            const dates = baseData.map(s => {
+                const parts = (s.date || "").split('/');
+                if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                return null;
+            }).filter(d => d && !isNaN(d.getTime())) as Date[];
+            
+            let dateRangeText = "Lịch học";
+            if (dates.length > 0) {
+                const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+                const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                dateRangeText = `Lịch học từ ngày ${format(minDate, 'dd/MM/yyyy')} đến ngày ${format(maxDate, 'dd/MM/yyyy')}`;
+            }
+
+            for (const cfg of categories) {
+                const worksheet = getSheet(cfg.key);
+                if (worksheet) {
+                    worksheet.autoFilter = undefined;
+                    worksheet.getCell('A6').value = dateRangeText;
+                    
+                    // Ghi dữ liệu trực tiếp
+                    cfg.data.forEach((item, index) => {
+                        const rowIndex = 8 + index;
+                        const row = worksheet.getRow(rowIndex);
+                        const rowValues: any[] = [];
+                        rowValues[1] = index + 1; // STT
+                        
+                        columns.forEach((col, colIdx) => {
+                            rowValues[colIdx + 2] = item[col] || '';
+                        });
+                        
+                        row.values = rowValues;
+
+                        for (let i = 1; i <= columns.length + 1; i++) {
+                            const cell = row.getCell(i);
+                            cell.border = {
+                                top: { style: 'thin' }, left: { style: 'thin' },
+                                bottom: { style: 'thin' }, right: { style: 'thin' }
+                            };
+                            cell.font = { name: 'Times New Roman', size: 12 };
+                            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                        }
+                    });
+
+                    // Footer theo mẫu trong ảnh
+                    const footerStartRow = 8 + cfg.data.length + 2;
+                    const now = new Date();
+                    const dateStr = `Hồ Chí Minh, ngày ${format(now, 'dd')} tháng ${format(now, 'MM')} năm ${format(now, 'yyyy')}`;
+                    
+                    const setFooterLine = (row: number, text: string, isBold: boolean = false, isItalic: boolean = false) => {
+                        try {
+                            worksheet.mergeCells(row, 10, row, 15);
+                            const cell = worksheet.getCell(row, 10);
+                            cell.value = text;
+                            cell.font = { name: 'Times New Roman', size: 12, bold: isBold, italic: isItalic };
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        } catch (e) {}
+                    };
+
+                    setFooterLine(footerStartRow, dateStr, false, true);
+                    setFooterLine(footerStartRow + 1, "Người lập biểu", true, false);
+                    setFooterLine(footerStartRow + 6, "Nguyễn Vĩnh Phúc", true, false);
+
+                    await yieldToUI();
+                }
+            }
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timeStr = format(new Date(), "dd-MM-yyyy_HH-mm");
+            a.download = `LichHoc_NguyenVinhPhuc_${timeStr}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Thành công", description: "Đã xuất lịch học theo mẫu." });
+        } catch (error: any) {
+            console.error("Export error:", error);
+            toast({ title: "Lỗi xuất file", description: error.message, variant: "destructive" });
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const columnDefs: any = { 
@@ -994,7 +1167,9 @@ export default function SchedulePage() {
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} disabled={isExporting} variant="ghost" size="icon" className="text-green-600">
+                                        {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
+                                    </Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
                                 </div>
                             </div>

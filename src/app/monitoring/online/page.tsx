@@ -11,16 +11,18 @@ import {
   Eye, Ban, FileUp, FileDown, CheckCircle2, ListFilter, Check, 
   ChevronsUpDown, Library, Clock, CalendarDays, Camera, School,
   Hash, Layers, Users, Landmark, User, FileText, StickyNote,
-  GraduationCap, AlertCircle, MessageSquare, DoorOpen, Map, Activity, CloudUpload, CloudDownload, Bell
+  GraduationCap, AlertCircle, MessageSquare, DoorOpen, Map, Activity, CloudUpload, CloudDownload, Bell, History, ChevronDown
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { usePermissions } from "@/hooks/use-permissions";
 import * as XLSX from 'xlsx';
 import { format, parse, isValid } from "date-fns";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { useMasterData } from "@/providers/master-data-provider";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
@@ -70,9 +72,10 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     {Icon && <Icon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />}
                     <span className="truncate">{t(title)}</span>
                     {sortState ? (
-                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} />
+                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "group-hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "group-hover:opacity-100")} />
+
                     )}
                 </Button>
             </PopoverTrigger>
@@ -207,130 +210,93 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, blockOp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8">
-                        <DialogTitle className="flex items-center gap-2">
-                            <ListFilter className="h-5 w-5 text-primary" />
-                            Bộ lọc nâng cao
-                        </DialogTitle>
-                        <div className="flex gap-2">
-                            {isNamingPreset ? (
-                                <div className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="Tên bộ lọc..." 
-                                        className="h-8 w-40 text-xs" 
-                                        value={newPresetName} 
-                                        onChange={e => setNewPresetName(e.target.value)} 
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                    />
-                                    <Tooltip><TooltipTrigger asChild><Button 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => {
-                                            if (newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                        disabled={isSaving}
-                                    >
-                                        <Check className="h-3 w-3 mr-1" /> Lưu
-                                    </Button></TooltipTrigger><TooltipContent><p>{t('Lưu bộ lọc mới')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => setIsNamingPreset(false)}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button></TooltipTrigger><TooltipContent><p>{t('Hủy')}</p></TooltipContent></Tooltip>
+            <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                <div className="flex items-center justify-between border-b pl-4 pr-12 py-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                        <ListFilter className="h-5 w-5 text-primary" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                                    <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
-                            ) : (
-                                <Tooltip><TooltipTrigger asChild><Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50"
-                                    onClick={() => setIsNamingPreset(true)}
-                                >
-                                    <CloudUpload className="mr-1 h-3 w-3" /> Lưu bộ lọc mới
-                                </Button></TooltipTrigger><TooltipContent><p>{t('Lưu thiết lập bộ lọc hiện tại')}</p></TooltipContent></Tooltip>
-                            )}
-                        </div>
-                    </div>
-                    <VisuallyHidden><DialogDescription>Lọc danh sách.</DialogDescription></VisuallyHidden>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-                    {/* Presets Sidebar */}
-                    <div className="border-r pr-2 py-4 hidden md:block overflow-y-auto max-h-[70vh]">
-                        <div className="px-3 mb-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Bộ lọc đã lưu</span>
-                            <span className="bg-primary/10 text-primary px-1.5 rounded-full">{presets?.length || 0}</span>
-                        </div>
-                        <div className="space-y-1 px-1">
-                            {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
-                                <div key={idx} className="group flex items-center gap-1 rounded-md hover:bg-muted p-1 transition-colors">
-                                    <Button 
-                                        variant="ghost" 
-                                        className="flex-1 justify-start h-8 text-xs font-medium px-2 py-1 text-left truncate overflow-hidden"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Button>
-                                    <Tooltip><TooltipTrigger asChild><Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10"
-                                        onClick={() => onDeleteCloud(preset.name)}
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button></TooltipTrigger><TooltipContent><p>{t('Xóa bộ lọc đã lưu')}</p></TooltipContent></Tooltip>
-                                </div>
-                            )) : (
-                                <p className="text-[10px] text-muted-foreground px-3 py-4 text-center italic">Chưa có bộ lọc nào.</p>
-                            )}
-                        </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-64">
+                                <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <History className="h-3.5 w-3.5" /> Bộ lọc đã lưu
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
+                                        <div key={idx} className="flex items-center group/item px-1">
+                                            <DropdownMenuItem className="flex-1 cursor-pointer" onSelect={() => setFilters(preset.filters)}>
+                                                <span className="truncate">{preset.name}</span>
+                                            </DropdownMenuItem>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); onDeleteCloud(preset.name); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    )) : (
+                                        <div className="px-2 py-4 text-center italic text-[10px] text-muted-foreground">Chưa có bộ lọc nào</div>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
-                    <ScrollArea className="max-h-[70vh] col-span-2">
-                        {/* Mobile Presets (Horizontal) */}
-                        <div className="md:hidden p-4 border-b">
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase mb-2 block">Bộ lọc đã lưu</Label>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {presets?.map((preset: any, idx: number) => (
-                                    <Badge 
-                                        key={idx} 
-                                        variant="secondary" 
-                                        className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Badge>
-                                ))}
+                    <div className="flex items-center gap-2">
+                        {isNamingPreset ? (
+                            <div className="flex items-center gap-1">
+                                <Input placeholder="Tên bộ lọc..." className="h-8 w-32 text-xs" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} />
+                                <Button size="sm" className="h-8 px-2" onClick={() => { if (newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} disabled={isSaving}><Check className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setIsNamingPreset(false)}><X className="h-3 w-3" /></Button>
                             </div>
-                        </div>
+                        ) : (
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-primary hover:bg-primary/10" onClick={() => setIsNamingPreset(true)}>
+                                <CloudUpload className="mr-1.5 h-3.5 w-3.5" /> Lưu hiện tại
+                            </Button>
+                        )}
+                    </div>
+                </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Ngày lọc</Label><DatePickerField value={filters.date} onChange={val => setFilters({...filters, date: val})} /></div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><Clock className="h-4 w-4 text-orange-500" /> Ca học</Label>
+                <VisuallyHidden><DialogDescription>Cấu hình bộ lọc nâng cao.</DialogDescription></VisuallyHidden>
+
+                <ScrollArea className="max-h-[70vh]">
+                    <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <CalendarDays className="h-4 w-4 text-primary" /> Ngày lọc
+                                </Label>
+                                <DatePickerField value={filters.date} onChange={val => setFilters({...filters, date: val})} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-orange-500" /> Ca học
+                                </Label>
                                 <Select value={filters.periodSession} onValueChange={v => setFilters({...filters, periodSession: v})}>
                                     <SelectTrigger><SelectValue placeholder="Chọn ca học..." /></SelectTrigger>
-                                    <SelectContent><SelectItem value="all">Tất cả</SelectItem><SelectItem value="morning">Ca sáng (1-6)</SelectItem><SelectItem value="afternoon">Ca chiều (7-12)</SelectItem><SelectItem value="evening">Ca tối (13-17)</SelectItem><SelectItem value="custom">Tùy chỉnh...</SelectItem></SelectContent>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tất cả</SelectItem>
+                                        <SelectItem value="morning">Ca sáng (1-6)</SelectItem>
+                                        <SelectItem value="afternoon">Ca chiều (7-12)</SelectItem>
+                                        <SelectItem value="evening">Ca tối (13-17)</SelectItem>
+                                        <SelectItem value="custom">Tùy chỉnh...</SelectItem>
+                                    </SelectContent>
                                 </Select>
                             </div>
                             {filters.periodSession === 'custom' && (
                                 <div className="md:col-span-2 grid grid-cols-2 gap-4 border p-3 rounded-lg bg-muted/20">
-                                    <div className="space-y-2"><Label className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Từ tiết</Label><Input type="number" min={1} max={17} value={filters.periodStart} onChange={e => setFilters({...filters, periodStart: e.target.value})} placeholder="1" /></div>
                                     <div className="space-y-2">
-                                        <Label className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Đến tiết</Label>
+                                        <Label className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4 text-primary" /> Từ tiết
+                                        </Label>
+                                        <Input type="number" min={1} max={17} value={filters.periodStart} onChange={e => setFilters({...filters, periodStart: e.target.value})} placeholder="1" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4 text-primary" /> Đến tiết
+                                        </Label>
                                         <Input type="number" min={1} max={17} value={filters.periodEnd} onChange={e => setFilters({...filters, periodEnd: e.target.value})} placeholder="17" />
                                     </div>
                                 </div>
@@ -340,11 +306,16 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, blockOp
                             <div className="space-y-2"><Label className="flex items-center gap-2"><DoorOpen className="h-4 w-4 text-primary" /> Phòng (Chọn nhiều)</Label><MultiSelect options={roomOptions} selected={filters.rooms} onChange={(v: any) => setFilters({...filters, rooms: v})} placeholder="Chọn phòng..." emptyText="Không có dữ liệu" /></div>
                             <div className="space-y-2"><Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Giảng viên (Chọn nhiều)</Label><MultiSelect options={lecturerOptions} selected={filters.lecturers} onChange={(v: any) => setFilters({...filters, lecturers: v})} placeholder="Chọn giảng viên..." emptyText="Không có dữ liệu" /></div>
                         </div>
-                    </ScrollArea>
-                </div>
-                <DialogFooter className="p-4 border-t">
-                    <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={() => setFilters({ date: format(new Date(), 'yyyy-MM-dd'), buildings: [], departments: [], rooms: [], lecturers: [], periodSession: 'all', periodStart: '', periodEnd: '' })}>Xóa tất cả</Button></TooltipTrigger><TooltipContent><p>{t('Thiết lập lại bộ lọc')}</p></TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button></TooltipTrigger><TooltipContent><p>{t('Áp dụng bộ lọc')}</p></TooltipContent></Tooltip>
+                    </div>
+                </ScrollArea>
+
+                <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setFilters({ date: format(new Date(), 'yyyy-MM-dd'), buildings: [], departments: [], rooms: [], lecturers: [], periodSession: 'all', periodStart: '', periodEnd: '' })} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                    </Button>
+                    <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -390,7 +361,7 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-6 text-sm bg-muted/20 p-4 rounded-lg">
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Ngày</Label>
-                                            {(mode === 'add' || mode === 'copy') ? 
+                                            {mode !== 'view' ? 
                                                 <DatePickerField 
                                                     value={formData.date?.includes('/') ? formData.date.split('/').reverse().join('-') : formData.date || ''} 
                                                     onChange={val => {
@@ -406,39 +377,39 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
                                                 <p className="font-bold">{formData.date}</p>
                                             }
                                         </div>
-                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Hash className="h-4 w-4 text-primary" /> Tiết</Label>{(mode === 'add' || mode === 'copy') ? <Input className="h-8" value={formData.period || ''} onChange={e => setFormData({...formData, period: e.target.value})} /> : <p className="font-bold">{formData.period}</p>}</div>
-                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> LT/TH</Label>{(mode === 'add' || mode === 'copy') ? <Select value={formData.type || 'none'} onValueChange={v => setFormData({...formData, type: v === 'none' ? '' : v})}><SelectTrigger className="h-8"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">---</SelectItem><SelectItem value="LT">Lý thuyết (LT)</SelectItem><SelectItem value="TH">Thực hành (TH)</SelectItem></SelectContent></Select> : <p className="font-bold">{formData.type}</p>}</div>
+                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Hash className="h-4 w-4 text-primary" /> Tiết</Label>{mode !== 'view' ? <Input className="h-8" value={formData.period || ''} onChange={e => setFormData({...formData, period: e.target.value})} /> : <p className="font-bold">{formData.period}</p>}</div>
+                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> LT/TH</Label>{mode !== 'view' ? <Select value={formData.type || 'none'} onValueChange={v => setFormData({...formData, type: v === 'none' ? '' : v})}><SelectTrigger className="h-8"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">---</SelectItem><SelectItem value="LT">Lý thuyết (LT)</SelectItem><SelectItem value="TH">Thực hành (TH)</SelectItem></SelectContent></Select> : <p className="font-bold">{formData.type}</p>}</div>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Khoa sử dụng</Label>
-                                            {(mode === 'add' || mode === 'copy') ? 
+                                            {mode !== 'view' ? 
                                                 <CreatableCombobox options={deptOptions} value={formData.department} onChange={(v: any) => setFormData({...formData, department: v})} placeholder="Chọn..." /> : 
                                                 <p className="font-bold">{formData.department}</p>
                                             }
                                         </div>
-                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Library className="h-4 w-4 text-blue-600" /> Lớp</Label>{(mode === 'add' || mode === 'copy') ? <Input className="h-8" value={formData.class || ''} onChange={e => setFormData({...formData, class: e.target.value})} /> : <p className="font-bold text-blue-600">{formData.class}</p>}</div>
-                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Sĩ số</Label>{(mode === 'add' || mode === 'copy') ? <Input type="number" className="h-8" value={formData.studentCount || ''} onChange={e => setFormData({...formData, studentCount: Number(e.target.value)})} /> : <p className="font-bold">{formData.studentCount}</p>}</div>
+                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Library className="h-4 w-4 text-blue-600" /> Lớp</Label>{mode !== 'view' ? <Input className="h-8" value={formData.class || ''} onChange={e => setFormData({...formData, class: e.target.value})} /> : <p className="font-bold text-blue-600">{formData.class}</p>}</div>
+                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Sĩ số</Label>{mode !== 'view' ? <Input type="number" className="h-8" value={formData.studentCount || ''} onChange={e => setFormData({...formData, studentCount: Number(e.target.value)})} /> : <p className="font-bold">{formData.studentCount}</p>}</div>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Giảng viên</Label>
-                                            {(mode === 'add' || mode === 'copy') ? 
+                                            {mode !== 'view' ? 
                                                 <CreatableCombobox options={lecturerOptions} value={formData.lecturer} onChange={(v: any) => setFormData({...formData, lecturer: v})} placeholder="Chọn..." /> : 
                                                 <p className="font-bold text-primary">{formData.lecturer}</p>
                                             }
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><Map className="h-4 w-4 text-primary" /> Dãy nhà</Label>
-                                            {(mode === 'add' || mode === 'copy') ? 
+                                            {mode !== 'view' ? 
                                                 <CreatableCombobox options={blockOptions} value={formData.building} onChange={(v: any) => setFormData({...formData, building: v})} placeholder="Chọn..." /> : 
                                                 <p className="font-bold">{formData.building}</p>
                                             }
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><DoorOpen className="h-4 w-4 text-primary" /> Phòng</Label>
-                                            {(mode === 'add' || mode === 'copy') ? 
+                                            {mode !== 'view' ? 
                                                 <CreatableCombobox options={roomOptions} value={formData.room} onChange={(v: any) => setFormData({...formData, room: v})} placeholder="Chọn..." /> : 
                                                 <p className="font-bold">{formData.room}</p>
                                             }
                                         </div>
-                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Nội dung</Label>{(mode === 'add' || mode === 'copy') ? <Input className="h-8" value={formData.content || ''} onChange={e => setFormData({...formData, content: e.target.value})} /> : <p className="text-xs">{formData.content}</p>}</div>
+                                        <div className="space-y-1"><Label className="text-muted-foreground flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Nội dung</Label>{mode !== 'view' ? <Input className="h-8" value={formData.content || ''} onChange={e => setFormData({...formData, content: e.target.value})} /> : <p className="text-xs">{formData.content}</p>}</div>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Trạng thái</Label>
                                             {(mode === 'add' || mode === 'copy') ? 
@@ -554,6 +525,7 @@ export default function OnlinePage() {
         recognitions, 
         incidentCategories 
     } = useMasterData();
+    const { permissions } = usePermissions('/monitoring/online') as any;
     
     // Memoize references to avoid unnecessary query re-creations
     const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
@@ -898,9 +870,9 @@ export default function OnlinePage() {
                                 <div className="flex items-center gap-2">
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
                                     <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx,.xls" />
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600" disabled={!permissions.add}><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600" disabled={!permissions.export}><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary" disabled={!permissions.add}><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
                                 </div>
                             </div>
                         </CardHeader>
@@ -927,12 +899,12 @@ export default function OnlinePage() {
                                                     />
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400">
+                                            <TableHead className="w-[60px] text-center text-white font-bold border-l border-blue-400 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700">
+                                                                <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors">
                                                                     <Cog className="h-5 w-5" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
@@ -957,12 +929,8 @@ export default function OnlinePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {(schedulesLoading && currentItems.length === 0) ? (
-                                            <TableRow>
-                                                <TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">
-                                                    {t('Đang tải...')}
-                                                </TableCell>
-                                            </TableRow>
+                                        {schedulesLoading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Đang tải...</TableCell></TableRow>
                                         ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                                             const isSelected = selectedSet.has(item.renderId);
                                             const isHandled = item.recognitionDate && item.employee && item.incident;
@@ -972,7 +940,7 @@ export default function OnlinePage() {
                                                     onClick={() => handleRowClick(item.renderId)} 
                                                     data-state={isSelected ? "selected" : ""} 
                                                     className={cn(
-                                                        "cursor-pointer odd:bg-white even:bg-muted/30 transition-all hover:bg-yellow-300 hover:text-black", 
+                                                        "cursor-pointer odd:bg-white even:bg-slate-50 transition-all hover:bg-yellow-300 hover:text-black group", 
                                                         "data-[state=selected]:bg-red-800 data-[state=selected]:text-white"
                                                     )}
                                                 >
@@ -996,17 +964,21 @@ export default function OnlinePage() {
                                                             )}
                                                         </TableCell>
                                                     ))}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
+                                                    <TableCell className="w-[60px] p-0 text-center border-l border-blue-100 sticky right-0 z-10 bg-white group-data-[state=selected]:bg-red-800 group-hover:bg-yellow-300 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] align-middle">
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <DropdownMenu modal={false}>
                                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
-                                                                        <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Ghi nhận</DropdownMenuItem>
-                                                                        <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>
-                                                                        <DropdownMenuSeparator />
-                                                                        <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                        {(permissions.edit || permissions.add) && <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Edit className="mr-2 h-4 w-4" />Ghi nhận</DropdownMenuItem>}
+                                                                        {permissions.add && <DropdownMenuItem onSelect={() => openDialog('copy', item)}><Copy className="mr-2 h-4 w-4" />Sao chép</DropdownMenuItem>}
+                                                                        {permissions.delete && (
+                                                                            <>
+                                                                                <DropdownMenuSeparator />
+                                                                                <DropdownMenuItem onSelect={() => { setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                                                                            </>
+                                                                        )}
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TooltipTrigger>
@@ -1015,7 +987,28 @@ export default function OnlinePage() {
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={Laptop}
+                                                title="Không tìm thấy lịch học trực tuyến"
+                                                filters={{ ...filters, ...advancedFilters }}
+                                                onClearFilters={() => {
+                                                    setFilters({});
+                                                    setAdvancedFilters({
+                                                        date: format(new Date(), 'yyyy-MM-dd'),
+                                                        buildings: [],
+                                                        departments: [],
+                                                        rooms: [],
+                                                        lecturers: [],
+                                                        periodSession: 'all',
+                                                        periodStart: '',
+                                                        periodEnd: ''
+                                                    });
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                        )}
                                     </TableBody>
                                 </Table>
                             </div>

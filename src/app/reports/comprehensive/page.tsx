@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { 
   FileSearch, Printer, FileDown, 
   Search, ShieldAlert, Filter,
@@ -111,11 +111,12 @@ const ColumnHeader = ({ title, columnKey, icon: Icon, t, sortConfig, requestSort
                     <span className="truncate flex-1">{title}</span>
                     {sortState ? (
                         sortState.direction === 'ascending' 
-                            ? <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} /> 
-                            : <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} />
+                            ? <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> 
+                            : <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 shrink-0 opacity-30", isFiltered ? "text-red-300 opacity-100" : "group-hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 shrink-0 opacity-30", isFiltered ? "text-red-500 opacity-100" : "group-hover:opacity-100")} />
                     )}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-0 shadow-2xl border-gray-100" align="start">
@@ -191,7 +192,17 @@ export default function ComprehensiveReportPage() {
   const { data: schedulesData, loading: schedulesLoading } = useCollection<DailySchedule>(schedulesRef);
 
   // Load complete lists from Master Data Provider to populate comboboxes
-  const { employees: masterEmployees, lecturers: masterLecturers, departments: masterDepartments, blocks: masterBlocks } = useMasterData();
+  const { 
+    employees: masterEmployees, 
+    lecturers: masterLecturers, 
+    departments: masterDepartments, 
+    blocks: masterBlocks,
+    requestPersonnelData
+  } = useMasterData();
+
+  useEffect(() => {
+    requestPersonnelData();
+  }, [requestPersonnelData]);
 
   // Combine standard master data + any free-text entries inside schedulesData
   const uniqueOptions = useMemo(() => {
@@ -577,7 +588,7 @@ export default function ComprehensiveReportPage() {
                        />
                     </TableHead>
                   ))}
-                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2]/95 border-l border-blue-300">
+                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2] border-l border-blue-300 sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
@@ -641,7 +652,7 @@ export default function ComprehensiveReportPage() {
                             )}
                         </TableCell>
                       ))}
-                      <TableCell className="p-2 text-center border-l bg-blue-50/5"></TableCell>
+                      <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                     </TableRow>
                   );
                 }) : (

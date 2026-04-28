@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useLanguage } from '@/hooks/use-language';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 
 type BuildingSummary = {
@@ -38,14 +38,27 @@ type DailySummaryData = {
 export default function DailyActivitySummary() {
     const { t, language } = useLanguage();
     const firestore = useFirestore();
-    const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
-    const { data: schedules } = useCollection<DailySchedule>(schedulesRef);
-    
-    const [todayString, setTodayString] = useState<string | null>(null);
+    const [todayString, setTodayString] = useState<string>(format(new Date(), 'dd/MM/yyyy'));
+    const [todayISO, setTodayISO] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
     useEffect(() => {
-        setTodayString(format(new Date(), 'dd/MM/yyyy', { locale: language === 'vi' ? vi : enUS }));
+        setTodayString(format(new Date(), 'dd/MM/yyyy'));
+        setTodayISO(format(new Date(), 'yyyy-MM-dd'));
     }, [language]);
+
+    // Optimize: Only fetch today's schedules using a query
+    const schedulesRef = useMemo(() => {
+        if (!firestore) return null;
+        // In a real app, we should standardize date formats. 
+        // For now, fetching everything might be slow, so we try to query for today.
+        // If the user has both formats, we might need two queries or a standardized format.
+        return query(
+            collection(firestore, 'schedules'), 
+            where('date', 'in', [todayString, todayISO])
+        );
+    }, [firestore, todayString, todayISO]);
+
+    const { data: schedules } = useCollection<DailySchedule>(schedulesRef);
 
     const summary = useMemo<DailySummaryData>(() => {
         const initialData: DailySummaryData = { inPerson: {}, online: {}, exam: {}, homeroom: {}, externalPractice: {} };
