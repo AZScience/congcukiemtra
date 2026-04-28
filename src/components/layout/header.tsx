@@ -5,7 +5,7 @@ import Link from "next/link";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserNav } from "./user-nav";
 import { Button } from "@/components/ui/button";
-import { Bell, Languages, Menu, Mail } from "lucide-react";
+import { Bell, Languages, Menu, Mail, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -203,18 +203,34 @@ function Notifications() {
 
 export function Header() {
   const { setLanguage, t } = useLanguage();
+  const { heavyLoading } = useMasterData();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6">
       <SidebarTrigger />
       
-      <div className="flex-1 text-center">
+      <div className="flex-1 text-center flex items-center justify-center gap-3">
         <h1 className="hidden md:block text-xl font-bold tracking-wider uppercase text-foreground">
           {t('KIỂM TRA NỘI BỘ')}
         </h1>
         <h1 className="block md:hidden text-base font-bold tracking-wider uppercase text-foreground">
           {t('KIỂM TRA NỘI BỘ')}
         </h1>
+        {heavyLoading && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 animate-pulse cursor-help">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <span className="text-[10px] font-bold uppercase tracking-tighter">Syncing</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">Đang đồng bộ dữ liệu sinh viên & giảng viên trong nền...</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       <TooltipProvider>

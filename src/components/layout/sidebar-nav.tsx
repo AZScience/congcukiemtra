@@ -153,10 +153,10 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { open, setOpen } = useSidebar();
   const { t } = useLanguage();
-  const { user, userRole, hasPermission, isSuperAdmin, loading } = usePermissions();
+  const { user, userRole, hasPermission, isSuperAdmin, isLoading } = usePermissions();
 
   const filteredMenuItems = React.useMemo(() => {
-    if (loading) return [];
+    if (isLoading) return [];
     
     return menuItems.map(item => {
       if (item.subItems) {
@@ -170,7 +170,7 @@ export function SidebarNav() {
       }
       return item;
     }).filter(Boolean) as typeof menuItems;
-  }, [hasPermission]);
+  }, [hasPermission, isLoading]);
   
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
 
@@ -274,7 +274,7 @@ export function SidebarNav() {
             </SidebarMenuItem>
         )
         )}
-        {loading && (
+        {isLoading && (
             <div className="px-4 py-2 text-xs text-muted-foreground animate-pulse">
                 {t('Đang tải menu...')}
             </div>

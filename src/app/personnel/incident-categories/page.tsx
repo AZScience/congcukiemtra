@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { 
   PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp, 
-  ArrowDown, Filter, X, EllipsisVertical, Save, FolderArchive, Eye, FileDown, FileUp, CheckCircle2, Undo2, Ban, ListFilter,
+  ArrowDown, Filter, X, EllipsisVertical, Save, FolderArchive, Eye, FileDown, FileUp, CheckCircle2, Undo2, Ban, ListFilter, ChevronDown,
   StickyNote, FilePenLine, FileText
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -80,19 +80,46 @@ const ColumnHeader = ({ columnKey, title, t, sortConfig, openPopover, setOpenPop
 
 const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, recognitions, t }: any) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Bộ lọc nâng cao</DialogTitle><VisuallyHidden><DialogDescription>Lọc danh sách việc phát sinh</DialogDescription></VisuallyHidden></DialogHeader>
-            <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><FolderArchive className="h-4 w-4 text-primary" /> Tên việc phát sinh</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><FilePenLine className="h-4 w-4 text-primary" /> Việc ghi nhận</Label>
-                    <Select value={filters.recognitionId || 'all'} onValueChange={v => setFilters({...filters, recognitionId: v === 'all' ? '' : v})}>
-                        <SelectTrigger><SelectValue placeholder="Tất cả" /></SelectTrigger>
-                        <SelectContent><SelectItem value="all">Tất cả</SelectItem>{recognitions?.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
-                    </Select>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3">
+                    <ListFilter className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                        <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
                 </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}>Áp dụng</Button></DialogFooter>
+
+            <VisuallyHidden><DialogDescription>Lọc danh sách việc phát sinh</DialogDescription></VisuallyHidden>
+
+            <ScrollArea className="max-h-[70vh]">
+                <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><FolderArchive className="h-4 w-4 text-primary" /> Tên việc phát sinh</Label>
+                        <Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><FilePenLine className="h-4 w-4 text-primary" /> Việc ghi nhận</Label>
+                        <Select value={filters.recognitionId || 'all'} onValueChange={v => setFilters({...filters, recognitionId: v === 'all' ? '' : v})}>
+                            <SelectTrigger><SelectValue placeholder="Tất cả" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Tất cả</SelectItem>
+                                {recognitions?.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                </Button>
+                <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 );
@@ -133,7 +160,7 @@ export default function IncidentCategoriesPage() {
     const { data: recognitions } = useCollection<Recognition>(recognitionsRef);
     
     const recognitionMap = useMemo(() => new Map((recognitions || []).map(r => [r.id, r.name])), [recognitions]);
-    const permissions = usePermissions('/personnel/incident-categories');
+    const { permissions } = usePermissions('/personnel/incident-categories');
     const data = useMemo(() => (rawCats || []).map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })), [rawCats]);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

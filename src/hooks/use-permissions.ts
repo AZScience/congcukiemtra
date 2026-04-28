@@ -1,86 +1,90 @@
-
 import * as React from "react";
-import { useUser, useFirestore, useDoc, useCollection } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { useUser } from "@/firebase";
+import { useMasterData } from "@/providers/master-data-provider";
 import type { Employee, Role, Permissions } from "@/lib/types";
+import { roles as staticRoles, employees as staticEmployees } from "@/lib/data";
 
 export function usePermissions(pageId?: string) {
   const { user: authUser, loading: authLoading } = useUser();
-  const firestore = useFirestore();
+  const { employees: masterEmployees, roles: masterRoles, loading: masterLoading } = useMasterData();
 
+  // Find user data
+  const user = React.useMemo(() => {
+    if (!authUser) return null;
+    
+    // Check Firestore data from MasterDataProvider first
+    const firestoreUser = masterEmployees.find(e => 
+      e.id === authUser.uid || e.email?.toLowerCase() === authUser.email?.toLowerCase()
+    );
+    if (firestoreUser) return firestoreUser;
+    
+    // Fallback to static data
+    return staticEmployees.find(e => e.email?.toLowerCase() === authUser.email?.toLowerCase()) || null;
+  }, [masterEmployees, authUser]);
+
+  // Determine if Super Admin
   const isSuperAdmin = React.useMemo(() => {
-    if (!authUser?.email) return false;
+    // Check by email
     const superAdminEmails = [
       "ngviphuc@gmail.com", 
       "nguyen.phuc@ntt.edu.vn",
-      "phucn@ntt.edu.vn"
+      "phucn@ntt.edu.vn",
+      "vinhphuc@ntt.edu.vn",
+      "ngviphuc@ntt.edu.vn"
     ];
-    return superAdminEmails.some(e => e.toLowerCase() === authUser.email!.toLowerCase());
-  }, [authUser]);
+    if (authUser?.email && superAdminEmails.some(e => e.toLowerCase() === authUser.email!.toLowerCase())) return true;
+    
+    // Check by role name from user object
+    const roleName = String(user?.role || "").trim().toLowerCase();
+    const superAdminRoles = ['hệ thống', 'quản trị viên', 'admin', 'system', 'administrator'];
+    return superAdminRoles.includes(roleName);
+  }, [authUser, user]);
 
-  const employeeDocRef = React.useMemo(() => {
-    if (!firestore || !authUser) return null;
-    return doc(firestore, "employees", authUser.uid);
-  }, [firestore, authUser]);
+  // Merge roles
+  const allRoles = React.useMemo(() => {
+    if (!masterRoles || masterRoles.length === 0) return staticRoles as Role[];
+    
+    const merged = [...masterRoles];
+    staticRoles.forEach((sr: any) => {
+      if (!merged.find(r => r.id.toLowerCase() === sr.id.toLowerCase() || r.name.toLowerCase() === sr.name.toLowerCase())) {
+        merged.push(sr);
+      }
+    });
+    return merged;
+  }, [masterRoles]);
 
-  const { data: userByUid, loading: userByUidLoading, error: userByUidError } = useDoc<Employee>(employeeDocRef);
-  
-  const employeesByEmailQuery = React.useMemo(() => {
-    if (!firestore || !authUser?.email || (userByUid && !userByUidLoading)) return null;
-    return query(collection(firestore, "employees"), where("email", "==", authUser.email));
-  }, [firestore, authUser, userByUid, userByUidLoading]);
-
-  const { data: usersByEmail, loading: usersByEmailLoading, error: usersByEmailError } = useCollection<Employee>(employeesByEmailQuery as any);
-
-  const user = React.useMemo(() => {
-    if (userByUid) return userByUid;
-    if (usersByEmail && usersByEmail.length > 0) return usersByEmail[0];
-    return null;
-  }, [userByUid, usersByEmail]);
-
-  const userLoading = authLoading || userByUidLoading || (authUser?.email && !userByUid && usersByEmailLoading);
-  const userError = userByUidError || usersByEmailError;
-
-  const rolesCollectionRef = React.useMemo(() => {
-    if (!firestore || !authUser) return null;
-    return collection(firestore, "roles");
-  }, [firestore, authUser]);
-
-  const { data: allRoles, loading: rolesLoading, error: rolesError } = useCollection<Role>(rolesCollectionRef);
-
+  // Find specific role for user
   const userRole = React.useMemo(() => {
     if (!user || !allRoles) {
-      if (!user && !userLoading && authUser) {
-        console.warn('[usePermissions] User document not found for UID:', authUser.uid, 'Email:', authUser.email);
-        
-        // Even if user doc is missing, if they are Super Admin they should have full access
-        if (isSuperAdmin) {
-          return { name: "Super Admin", permissions: {} } as any; 
-        }
+      if (!user && !masterLoading && authUser && isSuperAdmin) {
+        return { name: "Super Admin", permissions: {} } as any; 
       }
       return null;
     }
     const searchRole = String(user.role || "").trim().toLowerCase();
-    console.log('[usePermissions] Searching for role:', `"${searchRole}"`, 'in', allRoles.length, 'roles');
     
-    // Try matching by ID first, then by Name
+    // Exact match
     let matched = allRoles.find((r) => 
       r.id.toLowerCase() === searchRole || 
       r.name.trim().toLowerCase() === searchRole
     );
 
-    // Special case for Admin/Quản trị if still not found
-    if (!matched && (searchRole === 'admin' || searchRole === 'administrator')) {
+    // Partial match fallback
+    if (!matched) {
       matched = allRoles.find(r => {
         const n = r.name.toLowerCase();
-        return n.includes('quản trị') || n.includes('admin');
+        return n.includes(searchRole) || searchRole.includes(n);
       });
     }
 
-    console.log('[usePermissions] Match result:', matched ? `Found "${matched.name}" (${matched.id})` : 'NOT FOUND');
-    return matched;
-  }, [allRoles, user, userLoading, authUser]);
+    if (process.env.NODE_ENV === 'development' && authUser) {
+      console.log(`[usePermissions] User: ${user.name}, Role In DB: "${user.role}", Matched Role: ${matched?.name || 'None'}`);
+    }
 
+    return matched;
+  }, [allRoles, user, masterLoading, authUser, isSuperAdmin]);
+
+  // Special System Role check
   const isSystemRole = React.useMemo(() => {
     const roleName = userRole?.name?.toLowerCase() || "";
     const systemNames = ["hệ thống", "admin", "administrator", "quản trị hệ thống", "quản trị viên"];
@@ -89,24 +93,45 @@ export function usePermissions(pageId?: string) {
   
   const hasFullAccess = isSuperAdmin || isSystemRole;
 
+  // Resolve all permissions with fallback to static defaults
   const allPermissions = React.useMemo(() => {
-    return userRole?.permissions || {};
+    const firestorePerms = userRole?.permissions || {};
+    
+    // Find corresponding static role to get defaults
+    const staticRole = staticRoles.find(sr => 
+      (userRole && sr.id.toLowerCase() === userRole.id.toLowerCase()) || 
+      (userRole && sr.name.trim().toLowerCase() === userRole.name.trim().toLowerCase())
+    );
+    
+    if (staticRole) {
+      const combined: Permissions = { ...staticRole.permissions };
+      
+      // Override with Firestore only if it has meaningful data
+      Object.keys(firestorePerms).forEach(key => {
+        const fp = firestorePerms[key];
+        const hasAnyPermission = fp.access || fp.view || fp.add || fp.edit || fp.delete || fp.import || fp.export;
+        if (hasAnyPermission) {
+          combined[key] = { ...combined[key], ...fp };
+        }
+      });
+      return combined;
+    }
+    
+    return firestorePerms;
   }, [userRole]);
 
+  // Get permissions for a specific page
   const getPagePermissions = React.useCallback((pid: string) => {
     if (hasFullAccess) {
-      return new Proxy({}, {
-        get: (_, prop) => {
-          if (prop === 'access' || prop === 'view' || prop === 'add' || prop === 'edit' || prop === 'delete' || prop === 'import' || prop === 'export') {
-            return true;
-          }
-          return undefined;
-        }
-      }) as any;
+      return { access: true, view: true, add: true, edit: true, delete: true, import: true, export: true };
     }
     
     const perms = allPermissions[pid];
-    console.log(`[usePermissions] Page: ${pid}, Perms:`, perms);
+    
+    if (process.env.NODE_ENV === 'development' && pageId === pid) {
+      console.log(`[usePermissions] Page: ${pid}, Resolved Perms:`, perms);
+    }
+
     if (!perms) return { access: false, view: false, add: false, edit: false, delete: false, import: false, export: false };
     
     return {
@@ -118,29 +143,23 @@ export function usePermissions(pageId?: string) {
       import: !!perms.import,
       export: !!perms.export
     };
-  }, [hasFullAccess, allPermissions]);
+  }, [allPermissions, hasFullAccess, pageId]);
 
-  const isLoading = authLoading || (authUser && (userLoading || rolesLoading));
-  const error = userError || rolesError;
+  // Legacy helper function used by Sidebar and other components
+  const hasPermission = React.useCallback((pid: string, key: keyof Permissions[string]) => {
+    const p = getPagePermissions(pid);
+    return !!(p as any)[key];
+  }, [getPagePermissions]);
 
-  // Convenient permissions for the requested pageId
-  const permissions = React.useMemo(() => {
-    return pageId ? getPagePermissions(pageId) : {};
-  }, [pageId, getPagePermissions]);
+  const isLoading = authLoading || masterLoading;
 
   return {
+    permissions: getPagePermissions(pageId || ""),
+    getPagePermissions,
+    hasPermission,
+    isSuperAdmin: hasFullAccess,
     user,
-    userRole,
-    allPermissions,
-    permissions, // Specific to pageId
-    hasPermission: React.useCallback((pid: string, action: keyof Permissions[string] = "access") => {
-        if (hasFullAccess) return true;
-        return !!allPermissions[pid]?.[action];
-    }, [hasFullAccess, allPermissions]),
-    isSuperAdmin,
-    isSystemRole,
-    hasFullAccess,
-    loading: isLoading,
-    error
+    isLoading,
+    userRole
   };
 }

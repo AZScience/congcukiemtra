@@ -223,7 +223,7 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, blockOp
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-4xl">
                 <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8">
+                    <div className="flex items-center justify-between pr-12">
                         <DialogTitle className="flex items-center gap-2">
                             <ListFilter className="h-5 w-5 text-primary" />
                             Bộ lọc nâng cao

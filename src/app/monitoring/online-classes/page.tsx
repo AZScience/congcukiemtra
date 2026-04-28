@@ -92,7 +92,7 @@ export default function OnlineClassesMonitoringPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const permissions = usePermissions('/monitoring/online-classes');
+    const { permissions } = usePermissions('/monitoring/online-classes');
     const [searchTerm, setSearchTerm] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);

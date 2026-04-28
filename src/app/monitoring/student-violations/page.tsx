@@ -13,7 +13,7 @@ import {
   Landmark, Users, Hash, Layers, GraduationCap, AlertCircle, 
   MessageSquare, User, Map, School, FileText, StickyNote, DoorOpen, Activity,
   ShieldAlert, UserCheck, FilePenLine, UserSquare, IdCard, Image as ImageIcon, Move, Search, ScanFace, CloudUpload, CloudDownload,
-  ChevronUp, ChevronDown
+  ChevronUp, ChevronDown, History
 } from 'lucide-react';
 import { logActivity } from "@/lib/activity-logger";
 import { useToast } from "@/hooks/use-toast";
@@ -563,7 +563,7 @@ const PhotoUpload = ({ value, onChange, disabled, label }: any) => {
     );
 };
 
-const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSave, t, employees, students, lecturers, filteredIncidents, blocks, departments }: any) => {
+const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSave, t, employees, students, studentsMap, lecturers, filteredIncidents, blocks, departments }: any) => {
     const [formData, setFormData] = useState<any>(initialFormData);
     const { toast } = useToast();
     const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -595,9 +595,9 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
     };
 
     const handleSearchStudent = () => {
-        const code = (formData.studentId || formData.identifier || '').trim();
+        const code = (formData.studentId || formData.identifier || '').trim().toLowerCase();
         if (!code) { toast({ title: "Thông báo", description: "Vui lòng nhập MSSV hoặc CCCD trước khi tìm.", variant: "destructive" }); return; }
-        const student = students?.find((s: any) => s.id === code || s.identifier === code || (s.id && s.id.toLowerCase() === code.toLowerCase()) || (s.identifier && s.identifier.toLowerCase() === code.toLowerCase()));
+        const student = studentsMap.get(code);
         if (student) {
             setSearchStatus('success');
             setFormData({ ...formData, fullName: student.name, studentId: student.id, identifier: student.identifier || code, class: student.class, building: student.building || formData.building, department: student.department || formData.department });
@@ -610,12 +610,12 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
     };
 
     const handleScan = (code: string) => {
-        let searchCode = code.trim(); let scannedName = ""; let isCCCD = false;
+        let searchCode = code.trim().toLowerCase(); let scannedName = ""; let isCCCD = false;
         if (code.includes('|')) {
             const parts = code.split('|');
-            if (parts.length >= 3) { searchCode = parts[0]; scannedName = parts[2]; isCCCD = true; }
+            if (parts.length >= 3) { searchCode = parts[0].toLowerCase(); scannedName = parts[2]; isCCCD = true; }
         }
-        const student = students?.find((s: any) => (s.id && s.id.toLowerCase() === searchCode.toLowerCase()) || (s.identifier && s.identifier.toLowerCase() === searchCode.toLowerCase()));
+        const student = studentsMap.get(searchCode);
         if (student) {
             setFormData({ ...formData, fullName: student.name, studentId: student.id, identifier: student.identifier || (isCCCD ? searchCode : formData.identifier), class: student.class, building: student.building || formData.building, department: student.department || formData.department });
             setSearchStatus('success'); toast({ title: "Đã tìm thấy sinh viên", description: `${student.name} (${student.id})` }); setTimeout(() => setSearchStatus('idle'), 2000);
@@ -718,78 +718,160 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t, bloc
     const [isNamingPreset, setIsNamingPreset] = useState(false);
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8"><DialogTitle className="flex items-center gap-2"><ListFilter className="h-5 w-5 text-primary" />Bộ lọc nâng cao</DialogTitle><div className="flex gap-2">{isNamingPreset ? (<div className="flex items-center gap-2"><Input placeholder="Tên bộ lọc..." className="h-8 w-40 text-xs" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} /><Button size="sm" className="h-8 px-2" onClick={() => { if (newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} disabled={isSaving}><Check className="h-3 w-3 mr-1" /> Lưu</Button><Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setIsNamingPreset(false)}><X className="h-3 w-3" /></Button></div>) : (<Button variant="outline" size="sm" className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50" onClick={() => setIsNamingPreset(true)}><CloudUpload className="mr-1 h-3 w-3" /> Lưu bộ lọc mới</Button>)}</div></div>
-                    <VisuallyHidden><DialogDescription>Lọc danh sách vi phạm.</DialogDescription></VisuallyHidden>
-                </DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-                    <div className="border-r pr-2 py-4 hidden md:block overflow-y-auto max-h-[70vh]">
-                        <div className="px-3 mb-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider"><span>Bộ lọc đã lưu</span><span className="bg-primary/10 text-primary px-1.5 rounded-full">{presets?.length || 0}</span></div>
-                        <div className="space-y-1 px-1">{presets?.length > 0 ? presets.map((preset: any, idx: number) => (<div key={idx} className="group flex items-center gap-1 rounded-md hover:bg-muted p-1 transition-colors"><Button variant="ghost" className="flex-1 justify-start h-8 text-xs font-medium px-2 py-1 text-left truncate overflow-hidden" onClick={() => setFilters(preset.filters)}>{preset.name}</Button><Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10" onClick={() => onDeleteCloud(preset.name)}><Trash2 className="h-3 w-3" /></Button></div>)) : (<p className="text-[10px] text-muted-foreground px-3 py-4 text-center italic">Chưa có bộ lọc nào được lưu.</p>)}</div>
+            <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                <div className="flex items-center justify-between border-b pl-4 pr-12 py-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                        <ListFilter className="h-5 w-5 text-primary" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                                    <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-64">
+                                <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <History className="h-3.5 w-3.5" /> Bộ lọc đã lưu
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
+                                        <div key={idx} className="flex items-center group/item px-1">
+                                            <DropdownMenuItem className="flex-1 cursor-pointer" onSelect={() => setFilters(preset.filters)}>
+                                                <span className="truncate">{preset.name}</span>
+                                            </DropdownMenuItem>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); onDeleteCloud(preset.name); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    )) : (
+                                        <div className="px-2 py-4 text-center italic text-[10px] text-muted-foreground">Chưa có bộ lọc nào</div>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
-                    <ScrollArea className="max-h-[70vh] col-span-2">
-                        <div className="md:hidden p-4 border-b"><Label className="text-[10px] font-bold text-muted-foreground uppercase mb-2 block">Bộ lọc đã lưu</Label><div className="flex gap-2 overflow-x-auto pb-2">{presets?.map((preset: any, idx: number) => (<Badge key={idx} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5" onClick={() => setFilters(preset.filters)}>{preset.name}</Badge>))}</div></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Từ ngày</Label><DatePickerField value={filters.fromDate || ''} onChange={val => setFilters({...filters, fromDate: val || ''})} className="h-9" /></div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Đến ngày</Label><DatePickerField value={filters.toDate || ''} onChange={val => setFilters({...filters, toDate: val || ''})} className="h-9" /></div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><Hash className="h-4 w-4 text-primary" /> Mã số SV / CCCD</Label><Input placeholder="Tìm MSSV hoặc CCCD..." value={filters.studentId || ''} onChange={e => setFilters({...filters, studentId: e.target.value})} /></div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Họ và tên</Label><Input placeholder="Tìm tên sinh viên..." value={filters.fullName || ''} onChange={e => setFilters({...filters, fullName: e.target.value})} /></div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><Map className="h-4 w-4 text-primary" /> Dãy nhà</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-between h-auto py-2 min-h-9 flex-wrap gap-1 text-left"><div className="flex flex-wrap gap-1">{filters.buildings?.length > 0 ? (filters.buildings.map((b: string) => (<Badge key={b} variant="secondary" className="px-1 font-normal text-[10px]">{b}<X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); setFilters({...filters, buildings: filters.buildings.filter((name: string) => name !== b)}); }} /></Badge>))) : (<span className="text-muted-foreground">Chọn dãy...</span>)}</div><ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" /></Button></PopoverTrigger>
-                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start"><Command><CommandInput placeholder="Tìm dãy nhà..." /><CommandList><CommandEmpty>Không tìm thấy.</CommandEmpty><CommandGroup>{blocks?.map((b: any) => (<CommandItem key={b.id} onSelect={() => { const isSelected = filters.buildings?.includes(b.name); const newBuildings = isSelected ? (filters.buildings || []).filter((name: string) => name !== b.name) : [...(filters.buildings || []), b.name]; setFilters({...filters, buildings: newBuildings}); }}><div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", filters.buildings?.includes(b.name) ? "bg-primary text-primary-foreground" : "opacity-50")}>{filters.buildings?.includes(b.name) && <Check className="h-3 w-3" />}</div>{b.name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent></Popover>
+
+                    <div className="flex items-center gap-2">
+                        {isNamingPreset ? (
+                            <div className="flex items-center gap-1">
+                                <Input placeholder="Tên bộ lọc..." className="h-8 w-32 text-xs" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} />
+                                <Button size="sm" className="h-8 px-2" onClick={() => { if (newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} disabled={isSaving}><Check className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setIsNamingPreset(false)}><X className="h-3 w-3" /></Button>
                             </div>
-                            <div className="space-y-2"><Label className="flex items-center gap-2"><UserCheck className="h-4 w-4 text-primary" /> Người ghi nhận</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-between h-auto py-2 min-h-9 flex-wrap gap-1 text-left"><div className="flex flex-wrap gap-1">{filters.officers?.length > 0 ? (filters.officers.map((o: string) => (<Badge key={o} variant="secondary" className="px-1 font-normal text-[10px]">{o}<X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); setFilters({...filters, officers: filters.officers.filter((name: string) => name !== o)}); }} /></Badge>))) : (<span className="text-muted-foreground">Chọn người...</span>)}</div><ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" /></Button></PopoverTrigger>
-                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start"><Command><CommandInput placeholder="Tìm người ghi nhận..." /><CommandList><CommandEmpty>Không tìm thấy.</CommandEmpty><CommandGroup>{Array.from(new Set(officers.map((o: any) => o.name))).filter(Boolean).sort().map((name: any) => (<CommandItem key={name} onSelect={() => { const isSelected = filters.officers?.includes(name); const newOfficers = isSelected ? (filters.officers || []).filter((n: string) => n !== name) : [...(filters.officers || []), name]; setFilters({...filters, officers: newOfficers}); }}><div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", filters.officers?.includes(name) ? "bg-primary text-primary-foreground" : "opacity-50")}>{filters.officers?.includes(name) && <Check className="h-3 w-3" />}</div>{name}</CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent></Popover>
-                            </div>
-                        </div>
-                    </ScrollArea>
+                        ) : (
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-primary hover:bg-primary/10" onClick={() => setIsNamingPreset(true)}>
+                                <CloudUpload className="mr-1.5 h-3.5 w-3.5" /> Lưu hiện tại
+                            </Button>
+                        )}
+                    </div>
                 </div>
-                <DialogFooter className="p-4 border-t"><Button variant="outline" onClick={() => setFilters({ fromDate: format(new Date(), 'yyyy-MM-dd'), toDate: format(new Date(), 'yyyy-MM-dd'), buildings: [], fullName: '', officers: [], studentId: '' })}><X className="mr-2 h-4 w-4" />Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" />Áp dụng</Button></DialogFooter>
+
+                <VisuallyHidden><DialogDescription>Cấu hình bộ lọc nâng cao cho danh sách vi phạm.</DialogDescription></VisuallyHidden>
+
+                <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-2 font-semibold">
+                                <CalendarDays className="h-4 w-4 text-primary" /> Ngày lọc
+                            </Label>
+                            <DatePickerField value={filters.filterDate || ''} onChange={val => setFilters({...filters, filterDate: val || ''})} className="h-10" />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-2 font-semibold">
+                                <Map className="h-4 w-4 text-primary" /> Dãy nhà
+                            </Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between h-10 px-3 text-left font-normal border-slate-200">
+                                        <div className="flex flex-wrap gap-1">
+                                            {filters.buildings?.length > 0 ? (
+                                                <div className="flex gap-1">
+                                                    <Badge variant="secondary" className="px-1.5 py-0 h-6">{filters.buildings.length} đã chọn</Badge>
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground">Tất cả dãy nhà</span>
+                                            )}
+                                        </div>
+                                        <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Tìm dãy nhà..." />
+                                        <CommandList>
+                                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                                            <CommandGroup>
+                                                {blocks?.map((b: any) => (
+                                                    <CommandItem key={b.id} onSelect={() => { const isSelected = filters.buildings?.includes(b.name); const newBuildings = isSelected ? (filters.buildings || []).filter((name: string) => name !== b.name) : [...(filters.buildings || []), b.name]; setFilters({...filters, buildings: newBuildings}); }}>
+                                                        <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", filters.buildings?.includes(b.name) ? "bg-primary text-primary-foreground" : "opacity-50")}>
+                                                            {filters.buildings?.includes(b.name) && <Check className="h-3 w-3" />}
+                                                        </div>
+                                                        {b.name}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setFilters({ filterDate: format(new Date(), 'yyyy-MM-dd'), buildings: [] })} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                    </Button>
+                    <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 };
+
 
 export default function StudentViolationsPage() {
     const { t } = useLanguage(); 
     const firestore = useFirestore(); 
     const { user: authUser } = useUser(); 
     const { toast } = useToast(); 
-    const { employees, students, lecturers, recognitions, incidentCategories } = useMasterData();
-    const permissions = usePermissions('/monitoring/student-violations');
+    const { employees, students, lecturers, recognitions, incidentCategories, employeesMap, studentsMap, lecturersMap } = useMasterData();
+    const { permissions, hasPermission, isSuperAdmin } = usePermissions('/monitoring/student-violations');
     const targetRecognition = useMemo(() => recognitions?.find(r => r.name === "Sinh viên vi phạm"), [recognitions]);
     const filteredIncidents = useMemo(() => { if (!incidentCategories) return []; const filtered = incidentCategories.filter(i => i.recognitionId === targetRecognition?.id); return filtered.length > 0 ? filtered : incidentCategories; }, [incidentCategories, targetRecognition]);
     const [refreshKey, setRefreshKey] = useState(0); const currentUserEmployee = useMemo(() => employees?.find(e => e.email === authUser?.email), [employees, authUser]);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); const [selectedItem, setSelectedItem] = useState<any>(null); const [formData, setFormData] = useState<Partial<StudentViolation>>({}); const [initialFormState, setInitialFormState] = useState<Partial<StudentViolation>>({}); const [dialogMode, setDialogMode] = useState<DialogMode>('add');
     const [currentPage, setCurrentPage] = useLocalStorage('violations_currentPage', 1); const [rowsPerPage, setRowsPerPage] = useLocalStorage('violations_rowsPerPage', 10); const [sortConfig, setSortConfig] = useLocalStorage<any[]>('violations_sortConfig', []);
     const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('violations_colVis_v5', { building: false, fullName: true, department: false, class: true, studentId: true, violationDate: true, violationType: true, signed: true, officer: true, note: true, identifier: false, portraitPhoto: true, documentPhoto: true });
-    const violationsQuery = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), limit(100)) : null, [firestore]);
+    const violationsQuery = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore]);
     const { data: rawViolations, loading: isViolationsLoading } = useCollection<StudentViolation>(violationsQuery);
     const violations = useMemo(() => { if (!rawViolations) return []; return rawViolations.map(v => ({ ...v, violationDate: v.violationDate || ((v as any).createdAt?.toDate ? format((v as any).createdAt.toDate(), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')) })); }, [rawViolations]);
-    const [filters, setFilters] = useLocalStorage<Partial<Record<keyof StudentViolation, string>>>('violations_filters', {}); const [openPopover, setOpenPopover] = useState<string | null>(null); const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false); const [advancedFilters, setAdvancedFilters] = useState<any>({ signed: '', fromDate: format(new Date(), 'yyyy-MM-dd'), toDate: format(new Date(), 'yyyy-MM-dd'), buildings: [], fullName: '', officers: [], studentId: '' });
+    const [filters, setFilters] = useLocalStorage<Partial<Record<keyof StudentViolation, string>>>('violations_filters', {}); const [openPopover, setOpenPopover] = useState<string | null>(null); const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false); const [advancedFilters, setAdvancedFilters] = useState<any>({ filterDate: format(new Date(), 'yyyy-MM-dd'), buildings: [] });
 
     const filteredItems = useMemo(() => {
         if (!violations) return [];
         return violations.filter(item => {
+            // Filter by current user if not super admin
+            if (!isSuperAdmin && currentUserEmployee?.nickname && item.officer !== currentUserEmployee.nickname) return false;
+
             const matchesColumnFilters = Object.entries(filters).every(([key, value]) => String((item as any)[key] ?? '').toLowerCase().includes(String(value).toLowerCase()));
             if (!matchesColumnFilters) return false;
             if (advancedFilters.signed && item.signed !== advancedFilters.signed) return false;
-            if (advancedFilters.fullName && !item.fullName?.toLowerCase().includes(advancedFilters.fullName.toLowerCase())) return false;
-            if (advancedFilters.officers?.length > 0 && (!item.officer || !advancedFilters.officers.includes(item.officer))) return false;
-            if (advancedFilters.studentId && !item.studentId?.toLowerCase().includes(advancedFilters.studentId.toLowerCase()) && !item.identifier?.toLowerCase().includes(advancedFilters.studentId.toLowerCase())) return false;
+
             if (advancedFilters.buildings?.length > 0 && (!item.building || !advancedFilters.buildings.includes(item.building))) return false;
-            if (advancedFilters.fromDate || advancedFilters.toDate) {
+            if (advancedFilters.filterDate) {
                 const itemDateStr = item.violationDate; if (itemDateStr) {
                     let normalizedItemDate = itemDateStr; if (itemDateStr.includes('/') && itemDateStr.split('/').length === 3) { const [d, m, y] = itemDateStr.split('/'); normalizedItemDate = `${y}-${m}-${d}`; }
-                    if (advancedFilters.fromDate && normalizedItemDate < advancedFilters.fromDate) return false;
-                    if (advancedFilters.toDate && normalizedItemDate > advancedFilters.toDate) return false;
+                    if (normalizedItemDate !== advancedFilters.filterDate) return false;
                 }
             }
             return true;
         });
-    }, [violations, filters, advancedFilters]);
+    }, [violations, filters, advancedFilters, isSuperAdmin, currentUserEmployee]);
 
     const sortedItems = useMemo(() => {
         let items = [...filteredItems];
@@ -974,13 +1056,8 @@ export default function StudentViolationsPage() {
                                                 onClearFilters={() => {
                                                     setFilters({});
                                                     setAdvancedFilters({
-                                                        signed: '',
-                                                        fromDate: format(new Date(), 'yyyy-MM-dd'),
-                                                        toDate: format(new Date(), 'yyyy-MM-dd'),
-                                                        buildings: [],
-                                                        fullName: '',
-                                                        officers: [],
-                                                        studentId: ''
+                                                        filterDate: format(new Date(), 'yyyy-MM-dd'),
+                                                        buildings: []
                                                     });
                                                     setCurrentPage(1);
                                                 }}
@@ -1002,7 +1079,7 @@ export default function StudentViolationsPage() {
                     </Card>
                 </div>
                 <AdvancedFilterDialog open={isAdvancedFilterOpen} onOpenChange={setIsAdvancedFilterOpen} filters={advancedFilters} setFilters={setAdvancedFilters} t={t} blocks={useMasterData().blocks} officers={employees} students={students} onSaveCloud={saveFiltersToCloud} onLoadCloud={loadFiltersFromCloud} onDeleteCloud={deleteFilterFromCloud} isSaving={isSavingFilters} presets={filterPresets} />
-                <EditDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mode={dialogMode} formData={formData} onSave={handleSave} t={t} employees={employees} students={students} lecturers={lecturers} filteredIncidents={filteredIncidents} blocks={useMasterData().blocks} departments={useMasterData().departments} />
+                <EditDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} mode={dialogMode} formData={formData} onSave={handleSave} t={t} employees={employees} students={students} studentsMap={studentsMap} lecturers={lecturers} filteredIncidents={filteredIncidents} blocks={useMasterData().blocks} departments={useMasterData().departments} />
                 <Dialog open={isImportPreviewOpen} onOpenChange={setIsImportPreviewOpen}>
                     <DialogContent className="sm:max-w-4xl"><DialogHeader><DialogTitle>Xem trước Import</DialogTitle></DialogHeader>
                         <ScrollArea className="max-h-[60vh] border rounded-md">

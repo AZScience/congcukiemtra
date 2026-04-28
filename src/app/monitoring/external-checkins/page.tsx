@@ -84,7 +84,7 @@ export default function ExternalCheckinsPage() {
     const { t } = useLanguage();
     const { toast } = useToast();
     const firestore = useFirestore();
-    const permissions = usePermissions('/monitoring/external-checkins');
+    const { permissions } = usePermissions('/monitoring/external-checkins');
 
     // Lấy dữ liệu từ collection external_checkins
     const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);

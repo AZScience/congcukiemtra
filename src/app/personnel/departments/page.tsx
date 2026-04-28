@@ -9,7 +9,7 @@ import {
   PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp, 
   ArrowDown, Filter, X, EllipsisVertical, Save, Landmark, 
-  Eye, FileDown, FileUp, CheckCircle2, Undo2, Ban, ListFilter,
+  Eye, FileDown, FileUp, CheckCircle2, Undo2, Ban, ListFilter, ChevronDown,
   IdCard, User, Users, Megaphone, Phone, Mail, StickyNote, FileText, UserCircle
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -117,14 +117,44 @@ const DeptEditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSav
 
 const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t }: any) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Bộ lọc nâng cao</DialogTitle><VisuallyHidden><DialogDescription>Lọc danh sách đơn vị</DialogDescription></VisuallyHidden></DialogHeader>
-            <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã đơn vị</Label><Input value={filters.departmentId || ''} onChange={e => setFilters({...filters, departmentId: e.target.value})} placeholder="Nhập mã..." /></div>
-                <div className="space-y-2"><Label className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Tên đơn vị</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
-                <div className="space-y-2"><Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Trưởng đơn vị</Label><Input value={filters.head || ''} onChange={e => setFilters({...filters, head: e.target.value})} placeholder="Nhập tên trưởng đơn vị..." /></div>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3">
+                    <ListFilter className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                        <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button></DialogFooter>
+
+            <VisuallyHidden><DialogDescription>Cấu hình bộ lọc nâng cao.</DialogDescription></VisuallyHidden>
+
+            <ScrollArea className="max-h-[70vh]">
+                <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã đơn vị</Label>
+                        <Input value={filters.departmentId || ''} onChange={e => setFilters({...filters, departmentId: e.target.value})} placeholder="Nhập mã..." />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Tên đơn vị</Label>
+                        <Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Trưởng đơn vị</Label>
+                        <Input value={filters.head || ''} onChange={e => setFilters({...filters, head: e.target.value})} placeholder="Nhập tên trưởng đơn vị..." />
+                    </div>
+                </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                </Button>
+                <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 );
@@ -136,11 +166,11 @@ export default function DepartmentsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const deptsRef = useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]);
-    const { permissions, loading: permsLoading, error: permsError } = usePermissions('/personnel/departments');
+    const { permissions, isLoading: permsLoading } = usePermissions('/personnel/departments');
     const { data: rawDepts, loading: dataLoading, error: dataError } = useCollection<Department>(deptsRef);
     
     const loading = permsLoading || dataLoading;
-    const error = permsError || dataError;
+    const error = dataError;
 
     const data = useMemo(() => (rawDepts || []).map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })), [rawDepts]);
 

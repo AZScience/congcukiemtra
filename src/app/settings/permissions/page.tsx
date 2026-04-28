@@ -48,6 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS } from '@/lib/permissions-defaults';
 import type { Role, Permissions } from '@/lib/types';
 
 const MODULE_CATEGORIES = [
@@ -568,13 +569,46 @@ export default function PermissionsPage() {
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-bold text-lg border-l-4 border-primary pl-3">Ma trận phân quyền</h3>
-                                        <Button variant="outline" size="sm" onClick={() => {
-                                            const allChecked = ALL_MODULES.every(m => PERMISSION_KEYS.every(k => formData.permissions?.[m.id]?.[k]));
-                                            ALL_MODULES.forEach(m => toggleRowPermissions(m.id, !allChecked));
-                                        }}>
-                                            <Check className="h-4 w-4 mr-2" />
-                                            Chọn / Bỏ chọn tất cả
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50">
+                                                        <RefreshCw className="h-4 w-4 mr-2" /> Áp dụng mẫu phân quyền
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-56">
+                                                    <DropdownMenuLabel>Chọn mẫu thiết lập</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setFormData(prev => ({ ...prev, permissions: JSON.parse(JSON.stringify(STAFF_PERMISSIONS)) }))}>
+                                                        <Users className="mr-2 h-4 w-4 text-blue-500" />
+                                                        Mẫu Nhân viên (Staff)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setFormData(prev => ({ ...prev, permissions: JSON.parse(JSON.stringify(CONTROLLER_PERMISSIONS)) }))}>
+                                                        <ShieldCheck className="mr-2 h-4 w-4 text-orange-500" />
+                                                        Mẫu Kiểm soát viên (Controller)
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => {
+                                                        const emptyPerms: Permissions = {};
+                                                        ALL_MODULES.forEach(m => {
+                                                            emptyPerms[m.id] = { access: false, view: false, add: false, edit: false, delete: false, import: false, export: false };
+                                                        });
+                                                        setFormData(prev => ({ ...prev, permissions: emptyPerms }));
+                                                    }}>
+                                                        <X className="mr-2 h-4 w-4 text-red-500" />
+                                                        Xóa tất cả quyền
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+
+                                            <Button variant="outline" size="sm" onClick={() => {
+                                                const allChecked = ALL_MODULES.every(m => PERMISSION_KEYS.every(k => formData.permissions?.[m.id]?.[k]));
+                                                ALL_MODULES.forEach(m => toggleRowPermissions(m.id, !allChecked));
+                                            }}>
+                                                <Check className="h-4 w-4 mr-2" />
+                                                Chọn / Bỏ chọn tất cả
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     <div className="border rounded-md overflow-hidden">

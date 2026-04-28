@@ -27,7 +27,11 @@ interface MasterDataContextType {
     roles: Role[];
     positions: Position[];
     students: Student[];
+    employeesMap: Map<string, Employee>;
+    lecturersMap: Map<string, Lecturer>;
+    studentsMap: Map<string, Student>;
     loading: boolean;
+    heavyLoading: boolean;
     loadStates: {
         employees: boolean;
         lecturers: boolean;
@@ -73,7 +77,56 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const { data: positions, loading: posLoading } = useCollection<Position>(positionsRef);
     const { data: students, loading: stuLoading } = useCollection<Student>(studentsRef);
 
-    const loading = empLoading || lecLoading || deptLoading || roomLoading || blockLoading || recLoading || incLoading || roleLoading || posLoading || stuLoading;
+    // Main loading state should ONLY wait for core data needed for permissions and layout
+    // Students and Lecturers are heavy and should not block the app shell
+    const coreLoading = empLoading || deptLoading || blockLoading || roleLoading || posLoading || recLoading || incLoading;
+    const heavyLoading = stuLoading || lecLoading || roomLoading;
+    const loading = coreLoading; 
+
+    const employeesMap = useMemo(() => {
+        const map = new Map<string, Employee>();
+        (employees || []).forEach(e => {
+            if (e.id) map.set(String(e.id), e);
+            if (e.email) map.set(String(e.email).toLowerCase(), e);
+            if (e.employeeId) map.set(String(e.employeeId), e);
+        });
+        return map;
+    }, [employees]);
+
+    const lecturersMap = useMemo(() => {
+        const map = new Map<string, Lecturer>();
+        (lecturers || []).forEach(l => {
+            if (l.id) map.set(String(l.id), l);
+            if (l.email) map.set(String(l.email).toLowerCase(), l);
+        });
+        return map;
+    }, [lecturers]);
+
+    const studentsMap = useMemo(() => {
+        const map = new Map<string, Student>();
+        (students || []).forEach(s => {
+            const sid = s.id ? String(s.id) : '';
+            if (sid) {
+                map.set(sid, s);
+                map.set(sid.toLowerCase(), s);
+            }
+            
+            // Map by citizenId (CCCD)
+            const cid = s.citizenId ? String(s.citizenId) : '';
+            if (cid) {
+                map.set(cid, s);
+                map.set(cid.toLowerCase(), s);
+            }
+            
+            // Map by identifier if present
+            const ident = s.identifier ? String(s.identifier) : '';
+            if (ident) {
+                map.set(ident, s);
+                map.set(ident.toLowerCase(), s);
+            }
+        });
+        return map;
+    }, [students]);
 
     const value = useMemo(() => ({
         employees: employees || [],
@@ -86,7 +139,11 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
         roles: roles || [],
         positions: positions || [],
         students: students || [],
+        employeesMap,
+        lecturersMap,
+        studentsMap,
         loading,
+        heavyLoading,
         loadStates: {
             employees: empLoading,
             lecturers: lecLoading,
@@ -102,7 +159,8 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     }), [
         employees, lecturers, departments, rooms, blocks, 
         recognitions, incidentCategories, roles, positions, students, 
-        loading, empLoading, lecLoading, deptLoading, roomLoading, 
+        employeesMap, lecturersMap, studentsMap,
+        loading, heavyLoading, empLoading, lecLoading, deptLoading, roomLoading, 
         blockLoading, recLoading, incLoading, roleLoading, posLoading, stuLoading
     ]);
 

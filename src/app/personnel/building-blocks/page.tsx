@@ -16,7 +16,7 @@ import {
   PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp, 
   ArrowDown, Filter, X, EllipsisVertical, Save, Building, 
-  Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter,
+  Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter, ChevronDown,
   StickyNote, IdCard, FileText, Activity, Hash
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -110,13 +110,40 @@ const BlockEditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSa
 
 const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t }: any) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Bộ lọc nâng cao</DialogTitle><VisuallyHidden><DialogDescription>Lọc danh sách dãy nhà</DialogDescription></VisuallyHidden></DialogHeader>
-            <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã phòng</Label><Input value={filters.code || ''} onChange={e => setFilters({...filters, code: e.target.value})} placeholder="Nhập mã..." /></div>
-                <div className="space-y-2"><Label className="flex items-center gap-2"><Building className="h-4 w-4 text-primary" /> Dãy nhà</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3">
+                    <ListFilter className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                        <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button></DialogFooter>
+
+            <VisuallyHidden><DialogDescription>Lọc danh sách dãy nhà</DialogDescription></VisuallyHidden>
+
+            <ScrollArea className="max-h-[70vh]">
+                <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã phòng</Label>
+                        <Input value={filters.code || ''} onChange={e => setFilters({...filters, code: e.target.value})} placeholder="Nhập mã..." />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><Building className="h-4 w-4 text-primary" /> Dãy nhà</Label>
+                        <Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." />
+                    </div>
+                </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                </Button>
+                <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 );
@@ -126,11 +153,11 @@ export default function BuildingBlocksPage() {
     const firestore = useFirestore();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const collectionRef = useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]);
-    const { permissions, loading: permsLoading, error: permsError } = usePermissions('/personnel/building-blocks');
+    const { permissions, isLoading: permsLoading } = usePermissions('/personnel/building-blocks');
     const { data: buildingBlocksData, loading: dataLoading, error: dataError } = useCollection<BuildingBlock>(collectionRef);
     
     const loading = permsLoading || dataLoading;
-    const error = permsError || dataError;
+    const error = dataError;
 
     const data = useMemo(() => (buildingBlocksData || []).map((item, idx) => ({ ...item, renderId: `${item.id || 'no-id'}-${idx}` })) as RenderBlock[], [buildingBlocksData]);
 
@@ -335,7 +362,7 @@ export default function BuildingBlocksPage() {
                                                                 <span className="font-bold text-slate-800">{(item as any)[columnKey]}</span>
                                                             </div>
                                                         ) : columnKey === 'isInactive' ? (
-                                                            <Badge variant={item.isInactive ? "destructive" : "success"}>{item.isInactive ? t('Ngưng hoạt động') : t('Đang hoạt động')}</Badge>
+                                                            <Badge variant={item.isInactive ? "destructive" : "default"}>{item.isInactive ? t('Ngưng hoạt động') : t('Đang hoạt động')}</Badge>
                                                         ) : (
                                                             <span className="text-slate-600 line-clamp-2">{(item as any)[columnKey] || '---'}</span>
                                                         )}

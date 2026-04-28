@@ -22,6 +22,7 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
+import { usePermissions } from "@/hooks/use-permissions";
 import { collection, doc, updateDoc, deleteField } from "firebase/firestore";
 import { useMasterData } from "@/providers/master-data-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -56,6 +57,7 @@ export default function EvidenceManagementPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { employees } = useMasterData();
+    const { permissions } = usePermissions('/monitoring/evidence');
 
     // --- Collections ---
     const schedulesRef = useMemo(() => firestore ? collection(firestore, 'schedules') : null, [firestore]);
@@ -592,14 +594,16 @@ export default function EvidenceManagementPage() {
                                             <span className="text-[10px] font-medium">{item.submittedByName}</span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {permissions.delete && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                             <div className="flex items-center gap-1.5 text-slate-400 ml-1">
                                                 <Clock className="h-3 w-3" />
                                                 <span className="text-[10px] font-medium">{item.dateStr}</span>
@@ -672,14 +676,16 @@ export default function EvidenceManagementPage() {
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100">
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {permissions.delete && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

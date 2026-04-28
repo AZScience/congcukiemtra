@@ -48,6 +48,9 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import type { Role, Permissions } from '@/lib/types';
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS } from '@/lib/permissions-defaults';
+import { LayoutGrid, CheckSquare } from 'lucide-react';
+
 
 const MODULE_CATEGORIES = [
     {
@@ -559,7 +562,29 @@ export default function RolesPage() {
                                             placeholder="Nhập mô tả cho vai trò này"
                                         />
                                     </div>
+                                    <div className="md:col-span-2 flex flex-wrap gap-2 items-center bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                                        <Label className="text-xs font-bold text-blue-700 uppercase flex items-center gap-2 mr-2">
+                                            <LayoutGrid className="h-3.5 w-3.5" /> Áp dụng mẫu nhanh:
+                                        </Label>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: STAFF_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Nhân viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: CONTROLLER_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Kiểm soát viên
+                                        </Button>
+                                    </div>
                                 </div>
+
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
