@@ -209,6 +209,13 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
       if (context) {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
+        
+        // Match mirroring of video preview
+        if (sourceType === 'camera' && isFrontCamera) {
+          context.translate(canvasRef.current.width, 0);
+          context.scale(-1, 1);
+        }
+        
         context.drawImage(videoRef.current, 0, 0);
         const dataUrl = canvasRef.current.toDataURL('image/png');
         addItem(dataUrl);
