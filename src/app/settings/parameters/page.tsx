@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSystemParameters } from "@/providers/system-parameters-provider";
+import { compressImage } from "@/lib/image-utils";
 
 export default function SystemParametersPage() {
   const { toast } = useToast();
@@ -34,20 +35,16 @@ export default function SystemParametersPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 1024 * 1024) { // 1MB limit for Base64 storage
-      toast({
-        variant: "destructive",
-        title: "File quá lớn",
-        description: "Vui lòng chọn ảnh dưới 1MB để đảm bảo hiệu suất."
-      });
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      setLocalParams({ ...localParams, bannerUrl: base64 });
-      toast({ title: "Đã tải ảnh lên", description: "Nhấn 'Lưu' để ghi nhớ thay đổi." });
+      try {
+        const compressed = await compressImage(base64, 800, 400, 0.8);
+        setLocalParams({ ...localParams, bannerUrl: compressed });
+        toast({ title: "Đã tải ảnh lên", description: "Ảnh đã được tối ưu hóa. Nhấn 'Lưu' để ghi nhớ thay đổi." });
+      } catch (err) {
+        toast({ variant: "destructive", title: "Lỗi xử lý ảnh", description: "Không thể tối ưu hóa ảnh này." });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -56,20 +53,17 @@ export default function SystemParametersPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) { // 2MB limit for login background
-      toast({
-        variant: "destructive",
-        title: "File quá lớn",
-        description: "Vui lòng chọn ảnh dưới 2MB để đảm bảo hiệu suất tải trang."
-      });
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      setLocalParams({ ...localParams, loginImageUrl: base64 });
-      toast({ title: "Đã tải ảnh nền mới", description: "Nhấn 'Lưu' để áp dụng cho trang Đăng nhập." });
+      try {
+        // Login background can be larger but still needs to stay under 1MB total doc limit
+        const compressed = await compressImage(base64, 1200, 800, 0.7);
+        setLocalParams({ ...localParams, loginImageUrl: compressed });
+        toast({ title: "Đã tải ảnh nền mới", description: "Ảnh đã được tối ưu hóa. Nhấn 'Lưu' để áp dụng." });
+      } catch (err) {
+        toast({ variant: "destructive", title: "Lỗi xử lý ảnh", description: "Không thể tối ưu hóa ảnh này." });
+      }
     };
     reader.readAsDataURL(file);
   };

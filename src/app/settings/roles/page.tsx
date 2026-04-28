@@ -15,7 +15,7 @@ import {
   FileQuestion, FileText, CalendarDays, BarChart3, Heart,
   FileStack, AlertCircle, Calendar, Settings2, Key, History,
   QrCode, MonitorPlay, MessageSquareQuote, Bot, MessagesSquare, Mail,
-  IdCard, FileType
+  IdCard, FileType, Camera
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -48,7 +48,7 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import type { Role, Permissions } from '@/lib/types';
-import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS } from '@/lib/permissions-defaults';
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS, ADMIN_PERMISSIONS, LECTURER_PERMISSIONS, ADVISOR_PERMISSIONS } from '@/lib/permissions-defaults';
 import { LayoutGrid, CheckSquare } from 'lucide-react';
 
 
@@ -114,7 +114,9 @@ const MODULE_CATEGORIES = [
         modules: [
             { id: '/monitoring/external-checkins', label: 'Giám sát thực hành', icon: QrCode },
             { id: '/monitoring/online-classes', label: 'Giám sát Online', icon: MonitorPlay },
+            { id: '/lecturer-portal', label: 'Portal Giảng viên', icon: GraduationCap },
             { id: '/feedback', label: 'Minh chứng ca trực', icon: MessageSquareQuote },
+            { id: '/monitoring/evidence', label: 'Kho minh chứng', icon: Camera },
             { id: '/ai/assistant', label: 'Tra cứu thông tin (AI)', icon: Bot },
             { id: '/discussion', label: 'Bảng thảo luận', icon: MessagesSquare },
             { id: '/messaging', label: 'Hộp thư nội bộ', icon: Mail }
@@ -570,6 +572,14 @@ export default function RolesPage() {
                                             variant="outline" 
                                             size="sm" 
                                             className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: ADMIN_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5 text-red-500" /> Mẫu Quản trị
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
                                             onClick={() => setFormData(prev => ({ ...prev, permissions: STAFF_PERMISSIONS }))}
                                         >
                                             <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Nhân viên
@@ -581,6 +591,22 @@ export default function RolesPage() {
                                             onClick={() => setFormData(prev => ({ ...prev, permissions: CONTROLLER_PERMISSIONS }))}
                                         >
                                             <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Kiểm soát viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: LECTURER_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Giảng viên
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 bg-white hover:bg-blue-600 hover:text-white transition-all text-[11px] font-bold"
+                                            onClick={() => setFormData(prev => ({ ...prev, permissions: ADVISOR_PERMISSIONS }))}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Mẫu Cố vấn HT
                                         </Button>
                                     </div>
                                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { 
   FileSearch, Printer, FileDown, 
   Search, ShieldAlert, Filter,
@@ -192,7 +192,17 @@ export default function ComprehensiveReportPage() {
   const { data: schedulesData, loading: schedulesLoading } = useCollection<DailySchedule>(schedulesRef);
 
   // Load complete lists from Master Data Provider to populate comboboxes
-  const { employees: masterEmployees, lecturers: masterLecturers, departments: masterDepartments, blocks: masterBlocks } = useMasterData();
+  const { 
+    employees: masterEmployees, 
+    lecturers: masterLecturers, 
+    departments: masterDepartments, 
+    blocks: masterBlocks,
+    requestPersonnelData
+  } = useMasterData();
+
+  useEffect(() => {
+    requestPersonnelData();
+  }, [requestPersonnelData]);
 
   // Combine standard master data + any free-text entries inside schedulesData
   const uniqueOptions = useMemo(() => {

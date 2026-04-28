@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
 import { useCollection, useFirestore, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { 
@@ -44,6 +44,8 @@ interface MasterDataContextType {
         positions: boolean;
         students: boolean;
     };
+    requestPersonnelData: () => void;
+    personnelRequested: boolean;
 }
 
 const MasterDataContext = createContext<MasterDataContextType | undefined>(undefined);
@@ -52,10 +54,11 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const firestore = useFirestore();
     const { user: authUser } = useUser();
     const isAuthenticated = !!authUser;
+    const [personnelRequested, setPersonnelRequested] = useState(false);
 
     // Define collection references
     const employeesRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'employees') : null), [firestore, isAuthenticated]);
-    const lecturersRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'lecturers') : null), [firestore, isAuthenticated]);
+    const lecturersRef = useMemo(() => (firestore && isAuthenticated && personnelRequested ? collection(firestore, 'lecturers') : null), [firestore, isAuthenticated, personnelRequested]);
     const departmentsRef = useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]);
     const roomsRef = useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]);
     const blocksRef = useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]);
@@ -63,7 +66,7 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const incidentCategoriesRef = useMemo(() => (firestore ? collection(firestore, 'incident-categories') : null), [firestore]);
     const rolesRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'roles') : null), [firestore, isAuthenticated]);
     const positionsRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'positions') : null), [firestore, isAuthenticated]);
-    const studentsRef = useMemo(() => (firestore && isAuthenticated ? collection(firestore, 'students') : null), [firestore, isAuthenticated]);
+    const studentsRef = useMemo(() => (firestore && isAuthenticated && personnelRequested ? collection(firestore, 'students') : null), [firestore, isAuthenticated, personnelRequested]);
 
     // Fetch data using useCollection hook
     const { data: employees, loading: empLoading } = useCollection<Employee>(employeesRef);
@@ -78,9 +81,8 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const { data: students, loading: stuLoading } = useCollection<Student>(studentsRef);
 
     // Main loading state should ONLY wait for core data needed for permissions and layout
-    // Students and Lecturers are heavy and should not block the app shell
     const coreLoading = empLoading || deptLoading || blockLoading || roleLoading || posLoading || recLoading || incLoading;
-    const heavyLoading = stuLoading || lecLoading || roomLoading;
+    const heavyLoading = (personnelRequested && (stuLoading || lecLoading)) || roomLoading;
     const loading = coreLoading; 
 
     const employeesMap = useMemo(() => {
@@ -94,15 +96,17 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     }, [employees]);
 
     const lecturersMap = useMemo(() => {
+        if (!personnelRequested) return new Map<string, Lecturer>();
         const map = new Map<string, Lecturer>();
         (lecturers || []).forEach(l => {
             if (l.id) map.set(String(l.id), l);
             if (l.email) map.set(String(l.email).toLowerCase(), l);
         });
         return map;
-    }, [lecturers]);
+    }, [lecturers, personnelRequested]);
 
     const studentsMap = useMemo(() => {
+        if (!personnelRequested) return new Map<string, Student>();
         const map = new Map<string, Student>();
         (students || []).forEach(s => {
             const sid = s.id ? String(s.id) : '';
@@ -111,14 +115,12 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
                 map.set(sid.toLowerCase(), s);
             }
             
-            // Map by citizenId (CCCD)
             const cid = s.citizenId ? String(s.citizenId) : '';
             if (cid) {
                 map.set(cid, s);
                 map.set(cid.toLowerCase(), s);
             }
             
-            // Map by identifier if present
             const ident = s.identifier ? String(s.identifier) : '';
             if (ident) {
                 map.set(ident, s);
@@ -126,7 +128,7 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
             }
         });
         return map;
-    }, [students]);
+    }, [students, personnelRequested]);
 
     const value = useMemo(() => ({
         employees: employees || [],
@@ -155,13 +157,16 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
             roles: roleLoading,
             positions: posLoading,
             students: stuLoading
-        }
+        },
+        requestPersonnelData: () => setPersonnelRequested(true),
+        personnelRequested
     }), [
         employees, lecturers, departments, rooms, blocks, 
         recognitions, incidentCategories, roles, positions, students, 
         employeesMap, lecturersMap, studentsMap,
         loading, heavyLoading, empLoading, lecLoading, deptLoading, roomLoading, 
-        blockLoading, recLoading, incLoading, roleLoading, posLoading, stuLoading
+        blockLoading, recLoading, incLoading, roleLoading, posLoading, stuLoading,
+        personnelRequested
     ]);
 
     return (

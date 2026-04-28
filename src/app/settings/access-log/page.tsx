@@ -3,7 +3,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   History, Eye, FileDown, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, ArrowUpDown, ArrowUp, 
@@ -181,7 +181,19 @@ export default function AccessLogPage() {
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user: authUser } = useUser();
-    const { employees, lecturers, students, employeesMap, lecturersMap, studentsMap } = useMasterData();
+    const { 
+        employees, 
+        lecturers, 
+        students, 
+        employeesMap, 
+        lecturersMap, 
+        studentsMap,
+        requestPersonnelData
+    } = useMasterData();
+
+    useEffect(() => {
+        requestPersonnelData();
+    }, [requestPersonnelData]);
 
     const logsRef = useMemo(() => {
         if (!firestore) return null;

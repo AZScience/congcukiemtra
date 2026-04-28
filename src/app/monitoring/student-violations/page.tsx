@@ -839,7 +839,21 @@ export default function StudentViolationsPage() {
     const firestore = useFirestore(); 
     const { user: authUser } = useUser(); 
     const { toast } = useToast(); 
-    const { employees, students, lecturers, recognitions, incidentCategories, employeesMap, studentsMap, lecturersMap } = useMasterData();
+    const { 
+        employees, 
+        students, 
+        lecturers, 
+        recognitions, 
+        incidentCategories, 
+        employeesMap, 
+        studentsMap, 
+        lecturersMap,
+        requestPersonnelData
+    } = useMasterData();
+
+    useEffect(() => {
+        requestPersonnelData();
+    }, [requestPersonnelData]);
     const { permissions, hasPermission, isSuperAdmin } = usePermissions('/monitoring/student-violations');
     const targetRecognition = useMemo(() => recognitions?.find(r => r.name === "Sinh viên vi phạm"), [recognitions]);
     const filteredIncidents = useMemo(() => { if (!incidentCategories) return []; const filtered = incidentCategories.filter(i => i.recognitionId === targetRecognition?.id); return filtered.length > 0 ? filtered : incidentCategories; }, [incidentCategories, targetRecognition]);

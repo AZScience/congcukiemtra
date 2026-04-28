@@ -1,10 +1,23 @@
 import { Permissions } from './types';
 
-export const STAFF_PERMISSIONS: Permissions = {
-    // Tổng quan
-    '/dashboard': { access: true, view: true },
+// Danh sách tất cả các module ID từ Roles Page
+export const ALL_MODULE_IDS = [
+    '/personnel/positions', '/personnel/building-blocks', '/personnel/departments', 
+    '/personnel/lecturers', '/personnel/employees', '/personnel/classrooms', 
+    '/personnel/gifts', '/personnel/students', '/personnel/roles', 
+    '/personnel/recognitions', '/personnel/incident-categories',
+    '/monitoring/homeroom', '/monitoring/online', '/monitoring/in-person', 
+    '/monitoring/exams', '/monitoring/external-practice', '/monitoring/student-violations', 
+    '/monitoring/asset-check', '/monitoring/requests', '/monitoring/petitions',
+    '/reports/daily', '/reports/comprehensive', '/reports/student-violations', 
+    '/reports/good-deeds', '/reports/request-reports', '/reports/incident-reports',
+    '/settings/schedule', '/settings/parameters', '/settings/permissions', '/settings/access-log',
+    '/monitoring/external-checkins', '/monitoring/online-classes', '/lecturer-portal', 
+    '/feedback', '/monitoring/evidence', '/ai/assistant', '/discussion', '/messaging'
+];
 
-    // Bộ danh mục (Chỉ xem)
+export const STAFF_PERMISSIONS: Permissions = {
+    '/dashboard': { access: true, view: true },
     '/personnel/positions': { access: true, view: true },
     '/personnel/building-blocks': { access: true, view: true },
     '/personnel/departments': { access: true, view: true },
@@ -15,8 +28,6 @@ export const STAFF_PERMISSIONS: Permissions = {
     '/personnel/students': { access: true, view: true },
     '/personnel/recognitions': { access: true, view: true },
     '/personnel/incident-categories': { access: true, view: true },
-
-    // Công cụ kiểm tra (Khớp với ma trận: Không Thêm, có Sửa/Ghi nhận)
     '/monitoring/homeroom': { access: true, view: true, add: false, edit: true },
     '/monitoring/online': { access: true, view: true, add: false, edit: true },
     '/monitoring/in-person': { access: true, view: true, add: false, edit: true },
@@ -26,20 +37,16 @@ export const STAFF_PERMISSIONS: Permissions = {
     '/monitoring/asset-check': { access: true, view: true, add: false, edit: true },
     '/monitoring/requests': { access: true, view: true, add: false, edit: true },
     '/monitoring/petitions': { access: true, view: true, add: false, edit: true },
-
-    // Báo cáo thống kê (Chỉ xem)
     '/reports/daily': { access: true, view: true },
     '/reports/comprehensive': { access: true, view: true },
     '/reports/student-violations': { access: true, view: true },
     '/reports/good-deeds': { access: true, view: true },
     '/reports/request-reports': { access: true, view: true },
     '/reports/incident-reports': { access: true, view: true },
-
-    // Công cụ hỗ trợ (Đầy đủ quyền)
     '/monitoring/external-checkins': { access: true, view: true, add: true, edit: true },
     '/monitoring/online-classes': { access: true, view: true, add: true, edit: true },
     '/feedback': { access: true, view: true, add: true, edit: true },
-    '/monitoring/evidence': { access: true, view: true, add: true, edit: true },
+    '/monitoring/evidence': { access: true, view: true, add: true, edit: true, delete: true },
     '/ai/assistant': { access: true, view: true },
     '/discussion': { access: true, view: true, add: true, edit: true },
     '/messaging': { access: true, view: true, add: true, edit: true },
@@ -51,6 +58,26 @@ export const CONTROLLER_PERMISSIONS: Permissions = {
         acc[key] = { ...STAFF_PERMISSIONS[key], export: true };
         return acc;
     }, {} as Permissions),
-    // Quyền xem log cho Controller
     '/settings/access-log': { access: true, view: true },
+};
+
+export const ADMIN_PERMISSIONS: Permissions = ALL_MODULE_IDS.reduce((acc, id) => {
+    acc[id] = { access: true, view: true, add: true, edit: true, delete: true, import: true, export: true };
+    return acc;
+}, { '/dashboard': { access: true, view: true } } as Permissions);
+
+export const LECTURER_PERMISSIONS: Permissions = {
+    '/dashboard': { access: true, view: true },
+    '/lecturer-portal': { access: true, view: true, add: true, edit: true },
+    '/discussion': { access: true, view: true, add: true, edit: true },
+    '/messaging': { access: true, view: true, add: true, edit: true },
+    '/ai/assistant': { access: true, view: true },
+};
+
+export const ADVISOR_PERMISSIONS: Permissions = {
+    '/dashboard': { access: true, view: true },
+    '/monitoring/homeroom': { access: true, view: true, add: true, edit: true },
+    '/discussion': { access: true, view: true, add: true, edit: true },
+    '/messaging': { access: true, view: true, add: true, edit: true },
+    '/ai/assistant': { access: true, view: true },
 };
