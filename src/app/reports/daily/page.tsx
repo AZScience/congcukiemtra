@@ -136,6 +136,8 @@ export default function DailyReportPage() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [isPushingGlobal, setIsPushingGlobal] = useState(false);
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const templateCache = useRef<ArrayBuffer | null>(null);
   const [systemParams] = useLocalStorage<any>("system_parameters", {});
 
   
@@ -261,27 +263,137 @@ export default function DailyReportPage() {
     });
   }, [schedulesData, displayDate, currentNickname]);
 
-  const handleExportAll = () => {
-    const wb = XLSX.utils.book_new();
+  const handleExportAll_v3 = async () => {
+    if (isExportingAll) return;
+    setIsExportingAll(true);
     
-    const exportConfig = [
-      { name: "Phòng Học", data: inPersonData },
-      { name: "Trực Tuyến", data: onlineData },
-      { name: "Cố Vấn", data: homeroomData },
-      { name: "Vi Phạm SV", data: violationData },
-      { name: "Thi Kết Thúc", data: examData },
-      { name: "Thực Hành Ngoài", data: externalData }
-    ];
+    // Nạp thư viện ExcelJS ngay lập tức (nếu chưa nạp)
+    const ExcelJS = (await import('exceljs')).default;
+    
+    const loadingToast = toast({ title: "Đang xử lý", description: "Hệ thống đang chuẩn bị dữ liệu Excel..." });
+    
+    try {
+      const allExportCategories = [
+        { key: "PHONGHOC", data: inPersonData, cols: ['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail'] },
+        { key: "TRUCTUYEN", data: onlineData, cols: ['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail'] },
+        { key: "SINHHOAT", data: homeroomData, cols: ['employee', 'date', 'room', 'period', 'department', 'class', 'lecturer', 'studentCount', 'incident', 'isNotification', 'incidentDetail'] },
+        { key: "VIPHAM", data: violationData, cols: ['fullName', 'class', 'studentId', 'violationDate', 'violationType', 'officer', 'note'] },
+        { key: "LOPTHI", data: examData, cols: ['employee', 'date', 'room', 'period', 'department', 'class', 'proctor1', 'proctor2', 'proctor3', 'content', 'incident', 'isNotification', 'incidentDetail'] },
+        { key: "THUCHANH", data: externalData, cols: ['employee', 'date', 'room', 'period', 'type', 'department', 'class', 'studentCount', 'lecturer', 'content', 'incident', 'isNotification', 'incidentDetail'] }
+      ];
 
-    exportConfig.forEach(cfg => {
-      if (cfg.data.length > 0) {
-        const ws = XLSX.utils.json_to_sheet(cfg.data);
-        XLSX.utils.book_append_sheet(wb, ws, cfg.name);
+      if (!allExportCategories.some(cat => cat.data.length > 0)) {
+        toast({ title: "Thông báo", description: "Không có dữ liệu để xuất." });
+        return;
       }
-    });
 
-    if (wb.SheetNames.length > 0) {
-      XLSX.writeFile(wb, `BaoCaoCuoiNgay_${selectedDate}.xlsx`);
+      // Tải template (Sử dụng cache)
+      let arrayBuffer = templateCache.current;
+      if (!arrayBuffer) {
+        const response = await fetch('/templates/daily_report_template.xlsx');
+        if (!response.ok) throw new Error("Không thể tải tệp mẫu Excel.");
+        arrayBuffer = await response.arrayBuffer();
+        templateCache.current = arrayBuffer;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      const normalizeName = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').trim();
+      const sheetMap = new Map<string, ExcelJS.Worksheet>();
+      workbook.worksheets.forEach(ws => sheetMap.set(normalizeName(ws.name), ws));
+
+      let sheetsUpdated = 0;
+      const dateHeader = `Ngày báo cáo: ${displayDate}`;
+
+      // Hàm helper để giải phóng UI thread
+      const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+
+      for (const cfg of allExportCategories) {
+        if (cfg.data.length === 0) continue;
+        const worksheet = sheetMap.get(normalizeName(cfg.key));
+        if (worksheet) {
+          sheetsUpdated++;
+          worksheet.autoFilter = undefined;
+          
+          // Xác định dòng bắt đầu: VIPHAM từ dòng 8, các sheet khác từ dòng 7
+          const dataStartRow = cfg.key === "VIPHAM" ? 8 : 7;
+          
+          worksheet.getCell('A1').value = dateHeader;
+          worksheet.getCell('A5').value = dateHeader;
+
+          // Ghi dữ liệu hàng loạt và kẻ khung
+          cfg.data.forEach((item, index) => {
+            const rowIndex = dataStartRow + index;
+            const row = worksheet.getRow(rowIndex);
+            const rowValues: any[] = [];
+            rowValues[1] = index + 1; // STT
+            
+            cfg.cols.forEach((col, colIdx) => {
+              let val = (item as any)[col];
+              if (col === 'isNotification') {
+                val = val === true || val === 'true' || !!val;
+              } else {
+                val = val || '';
+              }
+              rowValues[colIdx + 2] = val;
+            });
+            
+            row.values = rowValues;
+
+            // Kẻ khung và định dạng font cho các ô trong dòng
+            for (let i = 1; i <= cfg.cols.length + 1; i++) {
+              const cell = row.getCell(i);
+              cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+              };
+              cell.font = { name: 'Times New Roman', size: 12 };
+              cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            }
+          });
+
+          const footerStartRow = dataStartRow + cfg.data.length + 2;
+          const [y, m, d] = selectedDate.split('-');
+          const setFooterLine = (row: number, text: string, isBold: boolean = false, isItalic: boolean = false) => {
+            try { worksheet.mergeCells(row, 10, row, 12); } catch (e) {}
+            const cell = worksheet.getCell(row, 10);
+            cell.value = text;
+            cell.font = { size: 12, bold: isBold, italic: isItalic, name: 'Times New Roman' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          };
+
+          setFooterLine(footerStartRow, `Hồ Chí Minh, ngày ${d} tháng ${m} năm ${y}`, false, true);
+          setFooterLine(footerStartRow + 1, "Người báo cáo", true, false);
+          setFooterLine(footerStartRow + 2, "(chữ ký)", false, true);
+          setFooterLine(footerStartRow + 6, "Nguyễn Vĩnh Phúc", true, false);
+          
+          // Nghỉ một chút để trình duyệt cập nhật UI
+          await yieldToUI();
+        }
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Tạo tên file theo định dạng: hovaten_dd-mm-yyyy_hh-mm
+      const now = new Date();
+      const timeStr = format(now, "dd-MM-yyyy_HH-mm");
+      a.download = `NguyenVinhPhuc_${timeStr}.xlsx`;
+      
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Thành công", description: `Đã xuất ${sheetsUpdated} bảng báo cáo.` });
+    } catch (error: any) {
+      console.error("Export error:", error);
+      toast({ title: "Lỗi xuất file", description: error.message, variant: "destructive" });
+    } finally {
+      setIsExportingAll(false);
     }
   };
 
@@ -358,9 +470,15 @@ export default function DailyReportPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1">
-                <Tooltip><TooltipTrigger asChild><Button variant="outline" onClick={handleExportAll} className="border-green-500 text-green-700 hover:bg-green-600 hover:text-white shadow-sm transition-all active:scale-95">
-                  <FileDown className="h-4 w-4 mr-2" /> Xuất Excel (Tất cả)
-                </Button></TooltipTrigger><TooltipContent><p>{t('Xuất toàn bộ các bảng báo cáo ra file Excel')}</p></TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button 
+                  disabled={isExportingAll}
+                  variant="outline" 
+                  onClick={handleExportAll_v3} 
+                  className="border-green-500 text-green-700 hover:bg-green-600 hover:text-white shadow-sm transition-all active:scale-95"
+                >
+                  {isExportingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                  {isExportingAll ? "Đang xuất..." : "Xuất Excel (Tất cả)"}
+                </Button></TooltipTrigger><TooltipContent><p>{t('Xuất toàn bộ các bảng báo cáo ra file Excel (Dùng Template)')}</p></TooltipContent></Tooltip>
               </div>
 
             </div>
