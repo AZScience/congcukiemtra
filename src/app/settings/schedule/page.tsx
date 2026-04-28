@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { format, parse, isValid } from "date-fns";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
+import type ExcelJS from 'exceljs';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFirestore, useCollection, useUser } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";

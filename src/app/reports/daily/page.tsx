@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
+import type ExcelJS from 'exceljs';
 
 import { pushToGoogleSheetDynamic, getGoogleSheetTabs, pushDailyReportToGoogleSheet } from "@/ai/flows/google-sheet-export";
 import { useToast } from "@/hooks/use-toast";
