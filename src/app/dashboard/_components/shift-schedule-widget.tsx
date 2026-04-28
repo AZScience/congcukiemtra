@@ -45,48 +45,44 @@ export default function ShiftScheduleWidget() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !firestore || !user) return;
+        if (!file || !firestore || !storage || !user) return;
         
         if (file.type !== 'application/pdf') {
             toast({ variant: 'destructive', title: t('Lỗi'), description: t('Chỉ hỗ trợ file PDF.') });
             return;
         }
 
-        if (file.size > 900 * 1024) {
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Kích thước file PDF quá lớn (tối đa 900KB). Vui lòng nén file lại để tránh đầy dung lượng hệ thống.') });
+        if (file.size > 5 * 1024 * 1024) { // Increase to 5MB since we use Storage now
+            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Kích thước file PDF quá lớn (tối đa 5MB).') });
             if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
         setIsUploading(true);
-        setIsExpanded(true); // Auto expand when uploading
+        setIsExpanded(true);
         
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            try {
-                const url = reader.result as string;
-                await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
-                    url,
-                    name: file.name,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: user.uid
-                });
+        try {
+            // 1. Upload to Firebase Storage
+            const storageRef = ref(storage, `system/shift_schedule_${Date.now()}.pdf`);
+            const uploadResult = await uploadBytes(storageRef, file);
+            const downloadUrl = await getDownloadURL(uploadResult.ref);
 
-                toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
-            } catch (error: any) {
-                console.error('Save error:', error);
-                toast({ variant: 'destructive', title: t('Lỗi'), description: t('Không thể lưu file.') });
-            } finally {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            }
-        };
-        reader.onerror = () => {
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Không thể đọc file.') });
+            // 2. Save URL to Firestore
+            await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
+                url: downloadUrl,
+                name: file.name,
+                updatedAt: new Date().toISOString(),
+                updatedBy: user.uid
+            });
+
+            toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
+        } catch (error: any) {
+            console.error('Upload error:', error);
+            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Không thể tải file lên.') });
+        } finally {
             setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
-        };
-        reader.readAsDataURL(file);
+        }
     };
 
     const updater = scheduleData ? employees.find(e => e.id === scheduleData.updatedBy) : null;

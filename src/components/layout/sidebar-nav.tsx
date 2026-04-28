@@ -184,7 +184,10 @@ export function SidebarNav() {
           filteredMenuItems.find(
             (item) =>
               item.subItems &&
-              item.subItems.some((sub) => pathname.startsWith(sub.href))
+              item.subItems.some((sub) => {
+                // Precise matching: either exact match or starts with href followed by a slash
+                return pathname === sub.href || pathname.startsWith(sub.href + "/");
+              })
           )?.label || null;
         
         if (activeMenu) {
@@ -199,12 +202,14 @@ export function SidebarNav() {
       filteredMenuItems.find(
         (item) =>
           item.subItems &&
-          item.subItems.some((sub) => pathname.startsWith(sub.href))
+          item.subItems.some((sub) => {
+            return pathname === sub.href || pathname.startsWith(sub.href + "/");
+          })
       )?.label || null;
     if (activeMenu) setOpenMenu(activeMenu);
   }, []); // Run once on mount
 
-  const isSubItemActive = (subItems: any[]) => subItems.some(item => pathname.startsWith(item.href));
+  const isSubItemActive = (subItems: any[]) => subItems.some(sub => pathname === sub.href || pathname.startsWith(sub.href + "/"));
 
   const handleMenuToggle = (label: string) => {
     if (!open) setOpen(true);

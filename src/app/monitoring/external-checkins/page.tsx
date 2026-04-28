@@ -35,7 +35,7 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, query, where, getDocs, updateDoc, orderBy, limit } from "firebase/firestore";
 import { usePermissions } from "@/hooks/use-permissions";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 
@@ -86,15 +86,40 @@ export default function ExternalCheckinsPage() {
     const firestore = useFirestore();
     const { permissions } = usePermissions('/monitoring/external-checkins');
 
-    // Lấy dữ liệu từ collection external_checkins
-    const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);
+    // Lấy dữ liệu từ collection external_checkins - Tối ưu: Lấy 100 bản ghi mới nhất
+    const checkinsRef = useMemo(() => firestore ? query(collection(firestore, 'external_checkins'), orderBy('timestamp', 'desc'), limit(100)) : null, [firestore]);
     const { data: rawData, loading } = useCollection(checkinsRef);
+    
     const records = useMemo(() => {
         return rawData?.map((item: any) => ({
             ...item,
             renderId: item.id || Math.random().toString()
         })) || [];
     }, [rawData]);
+
+    // Tính toán thống kê
+    const stats = useMemo(() => {
+        const now = new Date();
+        const todayStr = format(now, 'yyyy-MM-dd');
+        const todayDMY = format(now, 'dd/MM/yyyy');
+        
+        const todayItems = records.filter((r: any) => {
+            const rDate = r.scheduleDate || (r.timestamp?.seconds ? format(new Date(r.timestamp.seconds * 1000), 'yyyy-MM-dd') : '');
+            return rDate === todayStr || r.date === todayDMY;
+        });
+
+        const approvedToday = todayItems.filter((r: any) => r.status === 'approved').length;
+        const totalToday = todayItems.length;
+        
+        // "Đang dạy" - Ước tính dựa trên các check-in trong vòng 2 tiếng gần nhất
+        const twoHoursAgo = new Date(now.getTime() - 120 * 60 * 1000);
+        const ongoing = todayItems.filter((r: any) => {
+            const rTime = r.timestamp?.seconds ? new Date(r.timestamp.seconds * 1000) : new Date(r.timestamp);
+            return rTime > twoHoursAgo && r.status !== 'rejected';
+        }).length;
+
+        return { ongoing, totalToday, approvedToday };
+    }, [records]);
 
     const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
     const [dialogMode, setDialogMode] = useState<DialogMode>('view');
@@ -103,6 +128,9 @@ export default function ExternalCheckinsPage() {
     
     // Form state để duyệt
     const [reviewStatus, setReviewStatus] = useState<string>('pending_review');
+    const [reviewStudentCount, setReviewStudentCount] = useState<number | string>('');
+    const [reviewIncident, setReviewIncident] = useState<string>('');
+    const [reviewIncidentDetail, setReviewIncidentDetail] = useState<string>('');
     const [isDetailCollapsed, setIsDetailCollapsed] = useState(true);
     const [fullImage, setFullImage] = useState<string | null>(null);
 
@@ -188,22 +216,42 @@ export default function ExternalCheckinsPage() {
     const startIndex = (safeCurrentPage - 1) * safeRowsPerPage;
     const currentItems = sortedItems.slice(startIndex, startIndex + safeRowsPerPage);
 
-    const openDialog = (item: any) => {
-        setDialogMode('view');
+    const openDialog = (mode: DialogMode, item: any) => {
+        setDialogMode(mode);
         setSelectedItem(item);
         setReviewStatus(item.status || 'pending_review');
+        setReviewStudentCount(item.actualStudentCount ?? item.studentCount ?? '');
+        setReviewIncident(item.incident || '');
+        setReviewIncidentDetail(item.incidentDetail || '');
         setIsEditDialogOpen(true);
     };
 
     const handleSaveReview = async () => {
-        if (!firestore || !selectedItem) return;
+        if (!firestore || !selectedItem || dialogMode === 'view') return;
         try {
-            // 1. Cập nhật trạng thái của bản check-in
-            await setDoc(doc(firestore, "external_checkins", selectedItem.id), { status: reviewStatus }, { merge: true });
+            // 1. Cập nhật dữ liệu của bản check-in
+            const updateData = { 
+                status: reviewStatus,
+                actualStudentCount: reviewStudentCount,
+                incident: reviewIncident,
+                incidentDetail: reviewIncidentDetail
+            };
+            await setDoc(doc(firestore, "external_checkins", selectedItem.id), updateData, { merge: true });
 
             // 2. Nếu được duyệt (approved), đồng bộ dữ liệu sang bảng schedules (Thực hành ngoài)
             if (reviewStatus === 'approved') {
                 const schedulesRef = collection(firestore, 'schedules');
+                
+                // Lấy thông tin nhân viên từ localStorage nếu có
+                let currentUser = 'Hệ thống (Duyệt Check-in)';
+                try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                        const user = JSON.parse(userStr);
+                        if (user.displayName || user.fullName) currentUser = user.displayName || user.fullName;
+                    }
+                } catch (e) {}
+
                 // Tìm schedule khớp với mã lớp và ngày
                 const q = query(
                     schedulesRef, 
@@ -217,11 +265,11 @@ export default function ExternalCheckinsPage() {
                     const scheduleDoc = querySnapshot.docs[0];
                     await updateDoc(doc(firestore, 'schedules', scheduleDoc.id), {
                         recognitionDate: format(new Date(), 'yyyy-MM-dd'),
-                        employee: 'Hệ thống (Duyệt Check-in)', // Hoặc tên người duyệt nếu có auth
-                        incident: selectedItem.incident || '',
+                        employee: currentUser,
+                        incident: reviewIncident || '',
                         isNotification: selectedItem.isNotification || false,
-                        incidentDetail: selectedItem.incidentDetail || '',
-                        actualStudentCount: selectedItem.actualStudentCount || '',
+                        incidentDetail: reviewIncidentDetail || '',
+                        actualStudentCount: reviewStudentCount || '',
                         photoUrls: selectedItem.photoUrls || (selectedItem.photoUrl ? [selectedItem.photoUrl] : []),
                         note: `Đã duyệt từ tọa độ: ${selectedItem.location?.latitude}, ${selectedItem.location?.longitude}`
                     });
@@ -273,6 +321,42 @@ export default function ExternalCheckinsPage() {
                     title={t("Giám sát thực hành")} 
                     description={t("Kiểm duyệt minh chứng vị trí và hình ảnh từ cổng check-in của Giảng viên")} 
                 />
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                    <Card className="border-none shadow-sm bg-[#F9F5FF] overflow-hidden group hover:shadow-md transition-all duration-300">
+                        <CardContent className="p-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-bold text-[#7F56D9] uppercase tracking-wider">{t('ĐANG DẠY')}</span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-black text-[#53389E] group-hover:scale-110 transition-transform duration-500">{stats.ongoing}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm bg-[#F0F9FF] overflow-hidden group hover:shadow-md transition-all duration-300">
+                        <CardContent className="p-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-bold text-[#026AA2] uppercase tracking-wider">{t('TỔNG LƯỢT DẠY HÔM NAY')}</span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-black text-[#026AA2] group-hover:scale-110 transition-transform duration-500">{stats.totalToday}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm bg-[#F0FDF4] overflow-hidden group hover:shadow-md transition-all duration-300">
+                        <CardContent className="p-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[11px] font-bold text-[#067647] uppercase tracking-wider">{t('ĐÃ DUYỆT')}</span>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-4xl font-black text-[#067647] group-hover:scale-110 transition-transform duration-500">{stats.approvedToday}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 <Card className="border-t-4 border-t-blue-600 shadow-md">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -371,17 +455,30 @@ export default function ExternalCheckinsPage() {
                                                     return <TableCell key={key} className="border-r border-slate-200">{(item as any)[key]}</TableCell>;
                                                 })}
 
-                                                <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center p-2">
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button variant="ghost" size="icon" onClick={() => openDialog(item)} className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100">
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent><p>{t('Xem & Duyệt')}</p></TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
+                                                <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center p-1">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-100 text-blue-600">
+                                                                <EllipsisVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-40">
+                                                            <DropdownMenuItem onClick={() => openDialog('view', item)} className="cursor-pointer">
+                                                                <Eye className="mr-2 h-4 w-4 text-blue-600" /> {t('Xem chi tiết')}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => openDialog('edit', item)} className="cursor-pointer text-orange-600 focus:text-orange-600">
+                                                                <Edit className="mr-2 h-4 w-4" /> {t('Ghi nhận')}
+                                                            </DropdownMenuItem>
+                                                            {permissions.delete && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onClick={() => handleDelete([item.id])} className="cursor-pointer text-red-600 focus:text-red-600">
+                                                                        <Trash2 className="mr-2 h-4 w-4" /> {t('Xóa')}
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -453,11 +550,27 @@ export default function ExternalCheckinsPage() {
                                 </div>
                                 <div className="pt-2 border-t md:border-t-0">
                                     <Label className="text-slate-500 text-[10px] uppercase font-bold flex items-center gap-1 mb-1">
-                                        <Activity className="h-3 w-3 text-purple-600" /> Việc phát sinh
+                                        <Activity className="h-3 w-3 text-purple-600" /> Việc phát sinh (Gốc)
                                     </Label>
                                     <Badge variant={selectedItem.incident ? "destructive" : "outline"} className="text-[10px] py-0 h-5">
                                         {selectedItem.incident || "Không có"}
                                     </Badge>
+                                </div>
+                            </div>
+
+                            {/* Group Ghi nhận mới */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-600 uppercase tracking-tight">SV tham gia thực tế</Label>
+                                    <Input type="number" value={reviewStudentCount} onChange={(e) => setReviewStudentCount(e.target.value)} disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500 font-bold" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Việc phát sinh</Label>
+                                    <Input value={reviewIncident} onChange={(e) => setReviewIncident(e.target.value)} placeholder="Nhập sự cố nếu có..." disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500" />
+                                </div>
+                                <div className="col-span-full space-y-2">
+                                    <Label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Chi tiết sự việc</Label>
+                                    <Input value={reviewIncidentDetail} onChange={(e) => setReviewIncidentDetail(e.target.value)} placeholder="Mô tả chi tiết sự việc..." disabled={dialogMode === 'view'} className="bg-white border-blue-200 focus:ring-blue-500" />
                                 </div>
                             </div>
 
@@ -553,7 +666,7 @@ export default function ExternalCheckinsPage() {
 
                             <div className="space-y-2 mt-4 border-t pt-4">
                                 <Label className="text-base font-semibold">Quyết định phê duyệt</Label>
-                                <Select value={reviewStatus} onValueChange={setReviewStatus}>
+                                <Select value={reviewStatus} onValueChange={setReviewStatus} disabled={dialogMode === 'view'}>
                                     <SelectTrigger className={cn("h-12 text-base font-medium", 
                                         reviewStatus === 'approved' ? 'text-green-700 bg-green-50 border-green-200' : 
                                         reviewStatus === 'rejected' ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'
@@ -572,7 +685,7 @@ export default function ExternalCheckinsPage() {
 
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Đóng</Button>
-                        <Button onClick={handleSaveReview} className="bg-blue-600 hover:bg-blue-700">Lưu kết quả duyệt</Button>
+                        {dialogMode === 'edit' && <Button onClick={handleSaveReview} className="bg-blue-600 hover:bg-blue-700">Lưu kết quả duyệt</Button>}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -65,7 +65,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { Separator } from "@/components/ui/separator";
 import { useCollection, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { format } from 'date-fns';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Badge } from "@/components/ui/badge";
@@ -165,16 +165,6 @@ export default function ScheduleViewer() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
-    const { data: rawSchedules, loading } = useCollection<DailySchedule>(schedulesRef);
-    const { data: allBlocks } = useCollection<BuildingBlock>(useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]));
-    const { data: allDepts } = useCollection<Department>(useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]));
-    const { data: allRooms } = useCollection<Classroom>(useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]));
-    const { data: allLecturers } = useCollection<Lecturer>(useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]));
-
-    const schedules = useMemo(() => rawSchedules ? rawSchedules.map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[] : [], [rawSchedules]);
-
-    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState<any>({
         date: format(new Date(), 'yyyy-MM-dd'), 
         buildings: [], 
@@ -186,6 +176,33 @@ export default function ScheduleViewer() {
         periodEnd: '',
         statuses: []
     });
+
+    // Optimize: Fetch by date using a query
+    const schedulesRef = useMemo(() => {
+        if (!firestore) return null;
+        const dateISO = advancedFilters.date;
+        if (!dateISO) return collection(firestore, 'schedules'); // Fallback if no date (might be slow)
+        
+        let dateDMY = dateISO;
+        if (dateISO.includes('-')) {
+            const [y, m, d] = dateISO.split('-');
+            dateDMY = `${d}/${m}/${y}`;
+        }
+        
+        return query(
+            collection(firestore, 'schedules'),
+            where('date', 'in', [dateISO, dateDMY])
+        );
+    }, [firestore, advancedFilters.date]);
+
+    const { data: rawSchedules, loading } = useCollection<DailySchedule>(schedulesRef);
+    const { data: allBlocks } = useCollection<BuildingBlock>(useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]));
+    const { data: allDepts } = useCollection<Department>(useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]));
+    const { data: allRooms } = useCollection<Classroom>(useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]));
+    const { data: allLecturers } = useCollection<Lecturer>(useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]));
+
+    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+    const schedules = useMemo(() => rawSchedules ? rawSchedules.map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[] : [], [rawSchedules]);
 
     const [currentPage, setCurrentPage] = useLocalStorage('dash_schedules_currentPage_v1', 1);
     const [rowsPerPage, setRowsPerPage] = useLocalStorage('dash_schedules_rowsPerPage_v1', 10);

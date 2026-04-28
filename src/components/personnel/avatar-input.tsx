@@ -113,11 +113,17 @@ export function AvatarInput({ value, onChange, name, disabled }: AvatarInputProp
       }
       setStream(newStream);
       if (videoRef.current) videoRef.current.srcObject = newStream;
-    } catch (error) {
+    } catch (error: any) {
+      let description = 'Không thể truy cập thiết bị. Vui lòng kiểm tra quyền truy cập.';
+      if (error.name === 'NotReadableError') {
+        description = 'Camera đang bị ứng dụng khác sử dụng. Hãy tắt chúng và thử lại.';
+      } else if (error.name === 'AbortError') {
+        description = 'Lỗi khởi động camera (Timeout). Hãy thử lại.';
+      }
       toast({
         variant: 'destructive',
         title: 'Lỗi thiết bị',
-        description: 'Không thể truy cập thiết bị. Vui lòng kiểm tra quyền truy cập.',
+        description: description,
       });
     }
   };

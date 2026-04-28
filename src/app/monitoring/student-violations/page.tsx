@@ -246,8 +246,18 @@ const QRScannerDialog = ({ open, onOpenChange, onScan, t }: any) => {
 
             } catch (err: any) {
                 if (isMounted) {
-                    setError("Không thể khởi động Camera hoặc độ phân giải không hỗ trợ.");
-                    console.error(err);
+                    let userFriendlyMessage = "Không thể khởi động Camera hoặc độ phân giải không hỗ trợ.";
+                    
+                    if (err.name === 'NotReadableError' || err.message?.includes('NotReadableError')) {
+                        userFriendlyMessage = "Camera đang bị một ứng dụng khác (Zoom, Zalo, Teams...) chiếm dụng. Vui lòng tắt các ứng dụng đó và thử lại.";
+                    } else if (err.name === 'AbortError' || err.message?.includes('AbortError')) {
+                        userFriendlyMessage = "Hết thời gian khởi động Camera. Vui lòng tải lại trang hoặc kiểm tra kết nối thiết bị.";
+                    } else if (err.name === 'NotAllowedError' || err.message?.includes('Permission denied')) {
+                        userFriendlyMessage = "Bạn đã chặn quyền truy cập Camera. Vui lòng cấp quyền trong cài đặt trình duyệt để sử dụng tính năng này.";
+                    }
+
+                    setError(userFriendlyMessage);
+                    console.error("Scanner Error:", err);
                 }
             } finally {
                 isTransitioning.current = false;
@@ -457,8 +467,18 @@ const CameraCaptureDialog = ({ open, onOpenChange, onCapture, label }: any) => {
                     if (stream) stream.getTracks().forEach(t => t.stop());
                     const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } } });
                     setStream(s); if (videoRef.current) videoRef.current.srcObject = s;
-                } catch (err) {
-                    toast({ title: "Lỗi camera", description: "Không thể truy cập camera.", variant: "destructive" });
+                } catch (err: any) {
+                    let description = "Không thể truy cập camera.";
+                    if (err.name === 'NotReadableError') {
+                        description = "Camera đang được sử dụng bởi ứng dụng khác. Hãy tắt chúng và thử lại.";
+                    } else if (err.name === 'AbortError') {
+                        description = "Lỗi khởi động camera (Timeout). Hãy thử lại.";
+                    }
+                    toast({ 
+                        title: "Lỗi camera", 
+                        description: description, 
+                        variant: "destructive" 
+                    });
                     if (facingMode === 'environment') setFacingMode('user');
                 }
             };

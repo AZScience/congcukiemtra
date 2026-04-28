@@ -23,7 +23,7 @@ import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
 import { usePermissions } from "@/hooks/use-permissions";
-import { collection, doc, updateDoc, deleteField } from "firebase/firestore";
+import { collection, doc, updateDoc, deleteField, query, orderBy, limit } from "firebase/firestore";
 import { useMasterData } from "@/providers/master-data-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,13 +59,13 @@ export default function EvidenceManagementPage() {
     const { employees } = useMasterData();
     const { permissions } = usePermissions('/monitoring/evidence');
 
-    // --- Collections ---
-    const schedulesRef = useMemo(() => firestore ? collection(firestore, 'schedules') : null, [firestore]);
-    const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);
-    const requestsRef = useMemo(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
-    const petitionsRef = useMemo(() => firestore ? collection(firestore, 'petitions') : null, [firestore]);
-    const assetRef = useMemo(() => firestore ? collection(firestore, 'asset-receptions') : null, [firestore]);
-    const violationsRef = useMemo(() => firestore ? collection(firestore, 'student-violations') : null, [firestore]);
+    // --- Collections Optimized ---
+    const schedulesRef = useMemo(() => firestore ? query(collection(firestore, 'schedules'), orderBy('date', 'desc'), limit(100)) : null, [firestore]);
+    const checkinsRef = useMemo(() => firestore ? query(collection(firestore, 'external_checkins'), orderBy('timestamp', 'desc'), limit(50)) : null, [firestore]);
+    const requestsRef = useMemo(() => firestore ? query(collection(firestore, 'requests'), orderBy('requestDate', 'desc'), limit(50)) : null, [firestore]);
+    const petitionsRef = useMemo(() => firestore ? query(collection(firestore, 'petitions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const assetRef = useMemo(() => firestore ? query(collection(firestore, 'asset-receptions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const violationsRef = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), orderBy('violationDate', 'desc'), limit(50)) : null, [firestore]);
 
     const { data: schedulesData, loading: loadingSchedules } = useCollection<any>(schedulesRef);
     const { data: checkinsData, loading: loadingCheckins } = useCollection<any>(checkinsRef);
