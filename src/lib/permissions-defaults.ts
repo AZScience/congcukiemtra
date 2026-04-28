@@ -43,6 +43,7 @@ export const STAFF_PERMISSIONS: Permissions = {
     '/ai/assistant': { access: true, view: true },
     '/discussion': { access: true, view: true, add: true, edit: true },
     '/messaging': { access: true, view: true, add: true, edit: true },
+    '/lecturer-portal': { access: true, view: true, add: true, edit: true },
 };
 
 export const CONTROLLER_PERMISSIONS: Permissions = {

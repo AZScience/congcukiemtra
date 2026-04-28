@@ -145,6 +145,7 @@ export const menuItems = [
       { label: "Tra cứu thông tin", href: "/ai/assistant", icon: FileSearch, iconColor: "text-blue-500" },
       { label: "Bảng thảo luận", href: "/discussion", icon: Layout, iconColor: "text-pink-500" },
       { label: "Hộp thư nội bộ", href: "/messaging", icon: Mail, iconColor: "text-teal-500" },
+      { label: "Portal Giảng viên", href: "/lecturer-portal", icon: UserSquare, iconColor: "text-indigo-500" },
     ],
   },
 ];

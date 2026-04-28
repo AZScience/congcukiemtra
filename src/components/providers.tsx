@@ -91,23 +91,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const [isStandalonePage, setIsStandalonePage] = useState<boolean>(
+    const isStandalonePage = 
         pathname?.startsWith('/login') || 
         pathname?.startsWith('/lecturer-portal') || 
         pathname?.startsWith('/poll') || 
         pathname?.startsWith('/exam') || 
-        false
-    );
-
-    useEffect(() => {
-        setIsStandalonePage(
-            pathname?.startsWith('/login') || 
-            pathname?.startsWith('/lecturer-portal') || 
-            pathname?.startsWith('/poll') || 
-            pathname?.startsWith('/exam') || 
-            false
-        );
-    }, [pathname]);
+        false;
 
     if (isStandalonePage) {
         const isLecturerPortal = pathname?.startsWith('/lecturer-portal');
@@ -137,11 +126,9 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
     return (
         <AuthGuard>
-            <MasterDataProvider>
-                <VisitTrackerProvider>
-                    <AppShell>{children}</AppShell>
-                </VisitTrackerProvider>
-            </MasterDataProvider>
+            <VisitTrackerProvider>
+                <AppShell>{children}</AppShell>
+            </VisitTrackerProvider>
         </AuthGuard>
     );
 }
@@ -157,10 +144,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
                     disableTransitionOnChange
                 >
                     <LanguageProvider>
-                        <ClientOnly>
-                            <RootLayoutContent>{children}</RootLayoutContent>
-                            <Toaster />
-                        </ClientOnly>
+                        <MasterDataProvider>
+                            <ClientOnly>
+                                <RootLayoutContent>{children}</RootLayoutContent>
+                                <Toaster />
+                            </ClientOnly>
+                        </MasterDataProvider>
                     </LanguageProvider>
                 </ThemeProvider>
             </SystemParametersProvider>
