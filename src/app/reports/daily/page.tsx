@@ -352,7 +352,19 @@ export default function DailyReportPage() {
                 right: { style: 'thin' }
               };
               cell.font = { name: 'Times New Roman', size: 12 };
-              cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+              
+              // Căn lề: STT, Ngày(date), Tiết(period), Sĩ số(studentCount) căn giữa, còn lại căn trái
+              let horizontal: 'left' | 'center' = 'left';
+              if (i === 1) {
+                horizontal = 'center'; // STT
+              } else {
+                const colKey = cfg.cols[i - 2];
+                if (['date', 'period', 'studentCount'].includes(colKey)) {
+                  horizontal = 'center';
+                }
+              }
+
+              cell.alignment = { vertical: 'middle', horizontal, wrapText: true };
             }
           });
 

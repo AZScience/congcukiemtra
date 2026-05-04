@@ -966,11 +966,11 @@ export default function SchedulePage() {
                 }
             }
 
-            // Ưu tiên lấy toàn bộ dữ liệu của ngày đang lọc để tránh bị sót do bộ lọc Dãy nhà ở UI
-            const baseData = targetDate ? data.filter(s => s.date === targetDate) : sortedItems;
+            // Sử dụng chính xác danh sách đang hiển thị trên màn hình (đã qua tất cả các bộ lọc)
+            const baseData = sortedItems;
 
             if (!baseData || baseData.length === 0) {
-                toast({ title: "Thông báo", description: "Không có dữ liệu để xuất.", variant: "destructive" });
+                toast({ title: "Thông báo", description: "Không có dữ liệu phù hợp với bộ lọc để xuất.", variant: "destructive" });
                 setIsExporting(false);
                 return;
             }
@@ -1069,7 +1069,14 @@ export default function SchedulePage() {
                                 bottom: { style: 'thin' }, right: { style: 'thin' }
                             };
                             cell.font = { name: 'Times New Roman', size: 12 };
-                            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                            
+                            // Căn lề: STT(1), Ngày(2), Tiết(5), Sĩ số(9) căn giữa, còn lại căn trái
+                            const centerCols = [1, 2, 5, 9];
+                            cell.alignment = { 
+                                vertical: 'middle', 
+                                horizontal: centerCols.includes(i) ? 'center' : 'left', 
+                                wrapText: true 
+                            };
                         }
                     });
 

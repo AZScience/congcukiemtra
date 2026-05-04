@@ -516,18 +516,18 @@ export default function ExamsPage() {
     const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
     const { data: schedulesData, loading: schedulesLoading } = useCollection<DailySchedule>(schedulesRef);
     
-    // Find the recognition ID for "Thi cuối kỳ" or "Thi kết thúc môn"
-    const targetRecognition = useMemo(() => 
-        recognitions?.find(r => r.name === "Thi cuối kỳ" || r.name === "Thi kết thúc môn"),
-    [recognitions]);
-    
-    // Filter incident categories based on the specific recognition ID
-    // If no recognition is found, fall back to showing all incident categories to avoid empty combobox
+    // Lọc các danh mục việc phát sinh liên quan đến thi (Thi cuối kỳ, Thi kết thúc môn, v.v.)
     const filteredIncidents = useMemo(() => {
-        if (!incidentCategories) return [];
-        const filtered = incidentCategories.filter(i => i.recognitionId === targetRecognition?.id);
-        return filtered.length > 0 ? filtered : incidentCategories;
-    }, [incidentCategories, targetRecognition]);
+        if (!incidentCategories || !recognitions) return [];
+        
+        // Tìm các ID ghi nhận có tên chứa chữ "thi"
+        const thiRecIds = recognitions
+            .filter(r => r.name?.toLowerCase().includes("thi"))
+            .map(r => r.id);
+            
+        // Chỉ lấy các việc phát sinh thuộc các ghi nhận này
+        return incidentCategories.filter(i => thiRecIds.includes(i.recognitionId));
+    }, [incidentCategories, recognitions]);
     
     const currentUserEmployee = useMemo(() => 
         employees?.find(e => e.email?.toLowerCase() === authUser?.email?.toLowerCase()), 

@@ -18,6 +18,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSystemParameters } from "@/providers/system-parameters-provider";
 import { compressImage } from "@/lib/image-utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 export default function SystemParametersPage() {
   const { toast } = useToast();
@@ -589,11 +591,21 @@ export default function SystemParametersPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Model Name</Label>
-                    <Input 
-                      value={localParams.aiModel || ""} 
-                      onChange={e => setLocalParams({...localParams, aiModel: e.target.value})}
-                      placeholder="gemini-1.5-pro"
-                    />
+                    <Select 
+                      value={localParams.aiModel || "gemini-1.5-flash"} 
+                      onValueChange={val => setLocalParams({...localParams, aiModel: val})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Chọn model..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Mạnh nhất - Dễ hết hạn mức)</SelectItem>
+                        <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Cân bằng - Khuyên dùng)</SelectItem>
+                        <SelectItem value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8b (Rất nhanh - Tiết kiệm nhất)</SelectItem>
+                        <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Thế hệ mới - Nhanh)</SelectItem>
+                        <SelectItem value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash Lite (Xem trước)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
