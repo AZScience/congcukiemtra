@@ -209,7 +209,7 @@ export default function ScheduleViewer() {
     
     const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('dash_schedules_columnVisibility_v1', { 
         date: true, period: true, type: true, department: true, class: true, studentCount: true, 
-        content: true, status: true, isNotification: false, note: false
+        content: true, status: true, note: false
     });
     
     const [filters, setFilters] = useLocalStorage<Partial<Record<keyof DailySchedule, string>>>('dash_schedules_filters_v1', {});
@@ -311,7 +311,6 @@ export default function ScheduleViewer() {
         studentCount: { title: 'Sĩ số' }, 
         content: { title: 'Nội dung' }, 
         status: { title: 'Trạng thái' },
-        isNotification: { title: 'Thông báo' },
         note: { title: 'Ghi chú' }
     };
     const allColumns = Object.keys(columnDefs);
@@ -411,8 +410,6 @@ export default function ScheduleViewer() {
                                                          <span>{item.status}</span>
                                                          {item.incident && <Badge variant="destructive" className="text-[10px] h-4 px-1 w-fit">{item.incident}</Badge>}
                                                      </div>
-                                                 ) : key === 'isNotification' ? (
-                                                     item.isNotification ? <Badge className="bg-blue-600">Có</Badge> : <Badge variant="outline">Không</Badge>
                                                  ) : String((item as any)[key] ?? '')}
                                             </TableCell>
                                         ))}

@@ -23,7 +23,7 @@ import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
 import { usePermissions } from "@/hooks/use-permissions";
-import { collection, doc, updateDoc, deleteField, query, orderBy, limit } from "firebase/firestore";
+import { collection, doc, updateDoc, deleteField, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { useMasterData } from "@/providers/master-data-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -36,7 +36,7 @@ import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 // --- Types ---
 
-type EvidenceSource = 'direct' | 'online' | 'homeroom' | 'checkin' | 'feedback' | 'shift_schedule' | 'requests' | 'petitions' | 'asset_check' | 'violations' | 'exams' | 'practice';
+type EvidenceSource = 'direct' | 'online' | 'homeroom' | 'checkin' | 'feedback' | 'shift_schedule' | 'requests' | 'petitions' | 'asset_check' | 'violations' | 'exams' | 'practice' | 'document_records';
 
 interface UnifiedEvidence {
     id: string;
@@ -66,6 +66,8 @@ export default function EvidenceManagementPage() {
     const petitionsRef = useMemo(() => firestore ? query(collection(firestore, 'petitions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
     const assetRef = useMemo(() => firestore ? query(collection(firestore, 'asset-receptions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
     const violationsRef = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), orderBy('violationDate', 'desc'), limit(50)) : null, [firestore]);
+    const documentRecordsRef = useMemo(() => firestore ? query(collection(firestore, 'document_records'), orderBy('receivedDate', 'desc'), limit(50)) : null, [firestore]);
+    const shiftScheduleRef = useMemo(() => firestore ? doc(firestore, 'system_settings', 'shift_schedule') : null, [firestore]);
 
     const { data: schedulesData, loading: loadingSchedules } = useCollection<any>(schedulesRef);
     const { data: checkinsData, loading: loadingCheckins } = useCollection<any>(checkinsRef);
@@ -73,8 +75,21 @@ export default function EvidenceManagementPage() {
     const { data: petitionsData, loading: loadingPetitions } = useCollection<any>(petitionsRef);
     const { data: assetData, loading: loadingAsset } = useCollection<any>(assetRef);
     const { data: violationsData, loading: loadingViolations } = useCollection<any>(violationsRef);
+    const { data: documentRecordsData, loading: loadingDocumentRecords } = useCollection<any>(documentRecordsRef);
+    
+    const [shiftScheduleData, setShiftScheduleData] = useState<any>(null);
+    const [loadingShiftSchedule, setLoadingShiftSchedule] = useState(true);
 
-    const isLoading = loadingSchedules || loadingCheckins || loadingRequests || loadingPetitions || loadingAsset || loadingViolations;
+    useEffect(() => {
+        if (!shiftScheduleRef) return;
+        const unsubscribe = onSnapshot(shiftScheduleRef, (docSnap) => {
+            if (docSnap.exists()) setShiftScheduleData(docSnap.data());
+            setLoadingShiftSchedule(false);
+        });
+        return () => unsubscribe();
+    }, [shiftScheduleRef]);
+
+    const isLoading = loadingSchedules || loadingCheckins || loadingRequests || loadingPetitions || loadingAsset || loadingViolations || loadingDocumentRecords || loadingShiftSchedule;
 
     // --- State ---
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -297,9 +312,61 @@ export default function EvidenceManagementPage() {
             });
         }
 
+        // 7. From document_records (Quản lý hồ sơ)
+        if (documentRecordsData) {
+            documentRecordsData.forEach(item => {
+                if (item.originalFile) {
+                    const evidenceList = item.originalFile.split('|').filter(Boolean);
+                    if (evidenceList.length > 0) {
+                        let dateObj = new Date();
+                        if (item.receivedDate) {
+                            const parts = item.receivedDate.split('-');
+                            if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        }
+
+                        unified.push({
+                            id: `docrecord-${item.id}`,
+                            source: 'document_records',
+                            sourceLabel: 'Quản lý hồ sơ',
+                            title: `${item.docNumber || 'Văn bản'} - ${item.title}`,
+                            description: item.abstract || 'Tài liệu hồ sơ văn bản',
+                            date: dateObj,
+                            dateStr: item.receivedDate || format(dateObj, 'yyyy-MM-dd'),
+                            submittedBy: item.assignee || 'N/A',
+                            submittedByName: item.assignee || 'N/A',
+                            items: evidenceList,
+                            status: item.status,
+                            originalData: item
+                        });
+                    }
+                }
+            });
+        }
+
+        // 8. From system_settings/shift_schedule (Lịch trực)
+        if (shiftScheduleData && shiftScheduleData.url) {
+            let dateObj = new Date();
+            if (shiftScheduleData.updatedAt) dateObj = new Date(shiftScheduleData.updatedAt);
+
+            unified.push({
+                id: `shiftschedule-shift_schedule`,
+                source: 'shift_schedule',
+                sourceLabel: 'Lịch trực hệ thống',
+                title: `Lịch trực: ${shiftScheduleData.name || 'Bản mới nhất'}`,
+                description: `Cập nhật lần cuối: ${format(dateObj, 'HH:mm dd/MM/yyyy')}`,
+                date: dateObj,
+                dateStr: format(dateObj, 'dd/MM/yyyy'),
+                submittedBy: shiftScheduleData.updatedBy || 'System',
+                submittedByName: employees.find(e => e.id === shiftScheduleData.updatedBy)?.name || 'Hệ thống',
+                items: [shiftScheduleData.url],
+                status: 'Bản chính thức',
+                originalData: shiftScheduleData
+            });
+        }
+
         // Sort by date descending
         return unified.sort((a, b) => b.date.getTime() - a.date.getTime());
-    }, [schedulesData, checkinsData, requestsData, petitionsData, assetData, violationsData]);
+    }, [schedulesData, checkinsData, requestsData, petitionsData, assetData, violationsData, documentRecordsData, shiftScheduleData]);
 
     // --- Filtering ---
     const filteredEvidence = useMemo(() => {
@@ -387,6 +454,14 @@ export default function EvidenceManagementPage() {
                 case 'violations':
                     collectionName = 'student-violations';
                     // This is complex as it has 3 fields. We'll clear all photos.
+                    break;
+                case 'document_records':
+                    collectionName = 'document_records';
+                    updateField = 'originalFile';
+                    break;
+                case 'shift_schedule':
+                    collectionName = 'system_settings';
+                    updateField = 'url';
                     break;
             }
 
@@ -493,6 +568,8 @@ export default function EvidenceManagementPage() {
                                     <SelectItem value="petitions">Tiếp nhận đơn thư</SelectItem>
                                     <SelectItem value="asset_check">Nhận - Trả tài sản</SelectItem>
                                     <SelectItem value="violations">Sinh viên vi phạm</SelectItem>
+                                    <SelectItem value="document_records">Quản lý hồ sơ</SelectItem>
+                                    <SelectItem value="shift_schedule">Lịch trực hệ thống</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -524,18 +601,22 @@ export default function EvidenceManagementPage() {
                     </div>
                 ) : filteredEvidence.length === 0 ? (
                     <div className="bg-white rounded-xl border border-dashed border-slate-300 overflow-hidden shadow-sm">
-                        <DataTableEmptyState 
-                            colSpan={1} 
-                            icon={ImageIcon}
-                            title="Không tìm thấy minh chứng nào phù hợp"
-                            filters={{ searchTerm, filterSource, filterDate }}
-                            onClearFilters={() => {
-                                setSearchTerm('');
-                                setFilterSource('all');
-                                setFilterDate('');
-                                setCurrentPage(1);
-                            }}
-                        />
+                        <Table>
+                            <TableBody>
+                                <DataTableEmptyState 
+                                    colSpan={1} 
+                                    icon={ImageIcon}
+                                    title="Không tìm thấy minh chứng nào phù hợp"
+                                    filters={{ searchTerm, filterSource, filterDate }}
+                                    onClearFilters={() => {
+                                        setSearchTerm('');
+                                        setFilterSource('all');
+                                        setFilterDate('');
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </TableBody>
+                        </Table>
                     </div>
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -574,7 +655,9 @@ export default function EvidenceManagementPage() {
                                             item.source === 'requests' ? 'bg-sky-600' : 
                                             item.source === 'petitions' ? 'bg-teal-600' : 
                                             item.source === 'asset_check' ? 'bg-orange-600' : 
-                                            item.source === 'violations' ? 'bg-red-600' : 'bg-slate-600'
+                                            item.source === 'violations' ? 'bg-red-600' : 
+                                            item.source === 'document_records' ? 'bg-blue-800' : 
+                                            item.source === 'shift_schedule' ? 'bg-slate-900' : 'bg-slate-600'
                                         )}>
                                             {item.sourceLabel}
                                         </Badge>
@@ -658,7 +741,9 @@ export default function EvidenceManagementPage() {
                                                 item.source === 'requests' ? 'text-sky-600 border-sky-100 bg-sky-50' : 
                                                 item.source === 'petitions' ? 'text-teal-600 border-teal-100 bg-teal-50' : 
                                                 item.source === 'asset_check' ? 'text-orange-600 border-orange-100 bg-orange-50' : 
-                                                item.source === 'violations' ? 'text-red-600 border-red-100 bg-red-50' : 'text-slate-600 border-slate-100 bg-slate-50'
+                                                item.source === 'violations' ? 'text-red-600 border-red-100 bg-red-50' : 
+                                                item.source === 'document_records' ? 'text-blue-800 border-blue-100 bg-blue-50' : 
+                                                item.source === 'shift_schedule' ? 'text-slate-900 border-slate-200 bg-slate-100' : 'text-slate-600 border-slate-100 bg-slate-50'
                                             )}>
                                                 {item.sourceLabel}
                                             </Badge>
@@ -774,7 +859,9 @@ export default function EvidenceManagementPage() {
                                             selectedEvidence?.source === 'requests' ? 'bg-sky-600' : 
                                             selectedEvidence?.source === 'petitions' ? 'bg-teal-600' : 
                                             selectedEvidence?.source === 'asset_check' ? 'bg-orange-600' : 
-                                            selectedEvidence?.source === 'violations' ? 'bg-red-600' : 'bg-slate-600'
+                                            selectedEvidence?.source === 'violations' ? 'bg-red-600' : 
+                                            selectedEvidence?.source === 'document_records' ? 'bg-blue-800' : 
+                                            selectedEvidence?.source === 'shift_schedule' ? 'bg-slate-900' : 'bg-slate-600'
                                         )}>
                                             {selectedEvidence?.sourceLabel}
                                         </Badge>

@@ -88,6 +88,34 @@ export type Gift = {
   note: string;
 };
 
+export type DocumentType = {
+  id: string;
+  name: string;
+  note: string;
+};
+
+export type DocumentRecord = {
+  id: string;
+  docCode: string;
+  docNumber: string;
+  title: string;
+  abstract: string;
+  docType: string;
+  issueDate: string;
+  receivedDate: string;
+  issuingBody: string;
+  signer: string;
+  department: string;
+  assignee: string;
+  urgency: 'Thường' | 'Khẩn' | 'Hỏa tốc';
+  confidentiality: 'Thường' | 'Mật' | 'Tối mật';
+  status: 'Mới' | 'Đang xử lý' | 'Hoàn thành' | 'Quá hạn';
+  originalFile?: string;
+  extractedText?: string;
+  aiSummary?: string;
+  keywords?: string[];
+};
+
 export type BuildingBlock = {
   id: string;
   code: string;

@@ -7,7 +7,7 @@ import { FileText, Upload, Calendar, Loader2, Download, Eye, ChevronDown, Chevro
 import { useLanguage } from '@/hooks/use-language';
 import { useFirestore, useStorage, useUser } from '@/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from '@/hooks/use-toast';
 import { formatTimeAgo } from '@/lib/utils';
 import { useMasterData } from '@/providers/master-data-provider';
@@ -19,6 +19,7 @@ export default function ShiftScheduleWidget() {
     const { user } = useUser();
     const { employees } = useMasterData();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [scheduleData, setScheduleData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -52,36 +53,82 @@ export default function ShiftScheduleWidget() {
             return;
         }
 
-        if (file.size > 5 * 1024 * 1024) { // Increase to 5MB since we use Storage now
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Kích thước file PDF quá lớn (tối đa 5MB).') });
+        if (file.size > 10 * 1024 * 1024) { 
+            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Kích thước file PDF quá lớn (tối đa 10MB).') });
             if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
         setIsUploading(true);
+        setUploadProgress(0);
         setIsExpanded(true);
         
         try {
-            // 1. Upload to Firebase Storage
-            const storageRef = ref(storage, `system/shift_schedule_${Date.now()}.pdf`);
-            const uploadResult = await uploadBytes(storageRef, file);
-            const downloadUrl = await getDownloadURL(uploadResult.ref);
+            if (!storage || !firestore || !user) {
+                toast({ variant: 'destructive', title: t('Lỗi'), description: t('Hệ thống chưa sẵn sàng. Vui lòng thử lại sau.') });
+                setIsUploading(false);
+                return;
+            }
 
-            // 2. Save URL to Firestore
-            await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
-                url: downloadUrl,
-                name: file.name,
-                updatedAt: new Date().toISOString(),
-                updatedBy: user.uid
-            });
+            const storagePath = `system/shift_schedule_${Date.now()}.pdf`;
+            const storageRef = ref(storage, storagePath);
+            const uploadTask = uploadBytesResumable(storageRef, file);
 
-            toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
+            // Timeout mechanism to detect network blocks (60 seconds)
+            const timeoutId = setTimeout(() => {
+                uploadTask.cancel();
+                toast({ 
+                    variant: 'destructive', 
+                    title: t('Lỗi kết nối'), 
+                    description: t('Quá thời gian kết nối (60s). Mạng của bạn có thể đang chặn dịch vụ Firebase Storage.') 
+                });
+                setIsUploading(false);
+            }, 60000);
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(progress);
+                }, 
+                (error) => {
+                    clearTimeout(timeoutId);
+                    if (error.code !== 'storage/canceled') {
+                        console.error('Upload error:', error);
+                        toast({ 
+                            variant: 'destructive', 
+                            title: t('Lỗi tải lên'), 
+                            description: `${error.message} (${error.code})` 
+                        });
+                    }
+                    setIsUploading(false);
+                }, 
+                async () => {
+                    clearTimeout(timeoutId);
+                    try {
+                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+                        await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
+                            url: downloadUrl,
+                            name: file.name,
+                            updatedAt: new Date().toISOString(),
+                            updatedBy: user.uid
+                        });
+
+                        toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
+                    } catch (err: any) {
+                        console.error('Firestore update error:', err);
+                        toast({ variant: 'destructive', title: t('Lỗi lưu dữ liệu'), description: err.message });
+                    } finally {
+                        setIsUploading(false);
+                        setUploadProgress(0);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                }
+            );
         } catch (error: any) {
-            console.error('Upload error:', error);
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Không thể tải file lên.') });
-        } finally {
+            console.error('Initialization error:', error);
+            toast({ variant: 'destructive', title: t('Lỗi'), description: error.message });
             setIsUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -121,7 +168,7 @@ export default function ShiftScheduleWidget() {
                         disabled={isUploading}
                     >
                         {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                        {scheduleData ? t('Cập nhật lịch mới') : t('Tải lên lịch trực')}
+                        {isUploading ? `${Math.round(uploadProgress)}%` : (scheduleData ? t('Cập nhật lịch mới') : t('Tải lên lịch trực'))}
                     </Button>
                     {scheduleData && scheduleData.url && (
                         <Button size="sm" variant="default" asChild className="h-8">

@@ -33,6 +33,7 @@ import {
   Lock,
   MailQuestion,
   MonitorCheck,
+  Search,
   Shield,
   ShieldAlert,
   SlidersHorizontal,
@@ -61,6 +62,7 @@ import {
   Video,
   Layout,
   Camera,
+  FileText,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -91,6 +93,7 @@ export const menuItems = [
       { label: "Vai trò", href: "/personnel/roles", icon: Shield, iconColor: "text-purple-500" },
       { label: "Việc ghi nhận", href: "/personnel/recognitions", icon: FilePenLine, iconColor: "text-teal-500" },
       { label: "Việc phát sinh", href: "/personnel/incident-categories", icon: FolderArchive, iconColor: "text-pink-500" },
+      { label: "Loại văn bản", href: "/personnel/document-types", icon: FileText, iconColor: "text-blue-500" },
     ],
   },
   {
@@ -107,6 +110,7 @@ export const menuItems = [
       { label: "Nhận - Trả tài sản", href: "/monitoring/asset-check", icon: ClipboardPaste, iconColor: "text-pink-500" },
       { label: "Tiếp nhận yêu cầu", href: "/monitoring/requests", icon: MailQuestion, iconColor: "text-teal-500" },
       { label: "Tiếp nhận đơn thư", href: "/monitoring/petitions", icon: UserX, iconColor: "text-red-500" },
+      { label: "Quản lý hồ sơ", href: "/monitoring/document-records", icon: FolderArchive, iconColor: "text-amber-500" },
     ],
   },
   {
@@ -142,8 +146,9 @@ export const menuItems = [
       { label: "Giám sát Online", href: "/monitoring/online-classes", icon: Video, iconColor: "text-purple-500" },
       { label: "Minh chứng ca trực", href: "/feedback", icon: FileCheck, iconColor: "text-amber-500" },
       { label: "Kho minh chứng", href: "/monitoring/evidence", icon: Camera, iconColor: "text-blue-500" },
-      { label: "Tra cứu thông tin", href: "/ai/assistant", icon: FileSearch, iconColor: "text-blue-500" },
-      { label: "Bảng thảo luận", href: "/discussion", icon: Layout, iconColor: "text-pink-500" },
+       { label: "Tra cứu thông tin", href: "/ai/assistant", icon: FileSearch, iconColor: "text-blue-500" },
+       { label: "Tra cứu văn bản", href: "/monitoring/document-lookup", icon: Search, iconColor: "text-sky-500" },
+       { label: "Bảng thảo luận", href: "/discussion", icon: Layout, iconColor: "text-pink-500" },
       { label: "Hộp thư nội bộ", href: "/messaging", icon: Mail, iconColor: "text-teal-500" },
       { label: "Portal Giảng viên", href: "/lecturer-portal", icon: UserSquare, iconColor: "text-indigo-500" },
     ],

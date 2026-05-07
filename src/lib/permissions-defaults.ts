@@ -5,14 +5,14 @@ export const ALL_MODULE_IDS = [
     '/personnel/positions', '/personnel/building-blocks', '/personnel/departments', 
     '/personnel/lecturers', '/personnel/employees', '/personnel/classrooms', 
     '/personnel/gifts', '/personnel/students', '/personnel/roles', 
-    '/personnel/recognitions', '/personnel/incident-categories',
+    '/personnel/recognitions', '/personnel/incident-categories', '/personnel/document-types',
     '/monitoring/homeroom', '/monitoring/online', '/monitoring/in-person', 
     '/monitoring/exams', '/monitoring/external-practice', '/monitoring/student-violations', 
     '/monitoring/asset-check', '/monitoring/requests', '/monitoring/petitions',
     '/reports/daily', '/reports/comprehensive', '/reports/student-violations', 
     '/reports/good-deeds', '/reports/request-reports', '/reports/incident-reports',
     '/settings/schedule', '/settings/parameters', '/settings/permissions', '/settings/access-log',
-    '/monitoring/external-checkins', '/monitoring/online-classes', '/lecturer-portal', 
+    '/monitoring/external-checkins', '/monitoring/online-classes', '/monitoring/document-records', '/monitoring/document-lookup', '/lecturer-portal', 
     '/feedback', '/monitoring/evidence', '/ai/assistant', '/discussion', '/messaging'
 ];
 
@@ -28,6 +28,7 @@ export const STAFF_PERMISSIONS: Permissions = {
     '/personnel/students': { access: true, view: true },
     '/personnel/recognitions': { access: true, view: true },
     '/personnel/incident-categories': { access: true, view: true },
+    '/personnel/document-types': { access: true, view: true },
     '/monitoring/homeroom': { access: true, view: true, add: false, edit: true },
     '/monitoring/online': { access: true, view: true, add: false, edit: true },
     '/monitoring/in-person': { access: true, view: true, add: false, edit: true },
@@ -44,6 +45,8 @@ export const STAFF_PERMISSIONS: Permissions = {
     '/reports/request-reports': { access: true, view: true },
     '/reports/incident-reports': { access: true, view: true },
     '/monitoring/external-checkins': { access: true, view: true, add: true, edit: true },
+    '/monitoring/document-records': { access: true, view: true, add: true, edit: true },
+    '/monitoring/document-lookup': { access: true, view: true },
     '/monitoring/online-classes': { access: true, view: true, add: true, edit: true },
     '/feedback': { access: true, view: true, add: true, edit: true },
     '/monitoring/evidence': { access: true, view: true, add: true, edit: true, delete: true },

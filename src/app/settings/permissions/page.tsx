@@ -71,7 +71,8 @@ const MODULE_CATEGORIES = [
             { id: '/personnel/students', label: 'Danh mục Sinh viên', icon: Users2 },
             { id: '/personnel/roles', label: 'Danh mục Vai trò', icon: Shield },
             { id: '/personnel/recognitions', label: 'Việc ghi nhận', icon: Trophy },
-            { id: '/personnel/incident-categories', label: 'Việc phát sinh', icon: AlertTriangle }
+            { id: '/personnel/incident-categories', label: 'Việc phát sinh', icon: AlertTriangle },
+            { id: '/personnel/document-types', label: 'Loại văn bản', icon: FileType }
         ]
     },
     {
@@ -85,7 +86,8 @@ const MODULE_CATEGORIES = [
             { id: '/monitoring/student-violations', label: 'Sinh viên vi phạm', icon: UserX },
             { id: '/monitoring/asset-check', label: 'Nhận - Trả tài sản', icon: Package },
             { id: '/monitoring/requests', label: 'Tiếp nhận yêu cầu', icon: FileQuestion },
-            { id: '/monitoring/petitions', label: 'Tiếp nhận đơn thư', icon: FileText }
+            { id: '/monitoring/petitions', label: 'Tiếp nhận đơn thư', icon: FileText },
+            { id: '/monitoring/document-records', label: 'Quản lý hồ sơ', icon: FileStack }
         ]
     },
     {
@@ -115,7 +117,8 @@ const MODULE_CATEGORIES = [
             { id: '/monitoring/online-classes', label: 'Giám sát Online', icon: MonitorPlay },
             { id: '/feedback', label: 'Minh chứng ca trực', icon: MessageSquareQuote },
             { id: '/monitoring/evidence', label: 'Kho minh chứng', icon: Camera },
-            { id: '/ai/assistant', label: 'Tra cứu thông tin (AI)', icon: Bot },
+            { id: '/ai/assistant', label: 'Tra cứu thông tin', icon: Search },
+            { id: '/monitoring/document-lookup', label: 'Tra cứu văn bản', icon: Search },
             { id: '/discussion', label: 'Bảng thảo luận', icon: MessagesSquare },
             { id: '/messaging', label: 'Hộp thư nội bộ', icon: Mail },
             { id: '/lecturer-portal', label: 'Portal Giảng viên', icon: UserCircle }
