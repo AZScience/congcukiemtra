@@ -74,10 +74,13 @@ export async function verifyGoogleSheetConnection(
 }
 
 export async function verifyGoogleDriveConnection(
-    folderId: string,
-    email: string,
+    folderIdInput: string,
+    emailInput: string,
     privateKey: string
 ) {
+    const folderId = folderIdInput.trim();
+    const email = emailInput.trim();
+
     if (!folderId || !email || !privateKey) {
         return { success: false, message: "Vui lòng nhập Folder ID, Email và Private Key." };
     }
@@ -86,13 +89,13 @@ export async function verifyGoogleDriveConnection(
         const serviceAccountAuth = new JWT({
             email: email,
             key: cleanPrivateKey(privateKey),
-            scopes: ['https://www.googleapis.com/auth/drive.metadata.readonly'],
+            scopes: ['https://www.googleapis.com/auth/drive'],
         });
 
         const { token } = await serviceAccountAuth.getAccessToken();
         if (!token) throw new Error("Không lấy được token xác thực.");
 
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?fields=name,kind,mimeType`, {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?fields=name,kind,mimeType,capabilities`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -105,9 +108,17 @@ export async function verifyGoogleDriveConnection(
             return { success: false, message: "ID này không phải là một Thư mục (Folder)." };
         }
 
+        // Check for write permissions
+        if (!data.capabilities?.canAddChildren) {
+            return { 
+                success: false, 
+                message: `Kết nối thành công nhưng bạn chỉ có quyền XEM thư mục "${data.name}". Vui lòng cấp quyền "Người chỉnh sửa" (Editor) cho Service Account.` 
+            };
+        }
+
         return { 
             success: true, 
-            message: `Kết nối Drive thành công! Thư mục: "${data.name}".` 
+            message: `Kết nối Drive hoàn hảo! Thư mục: "${data.name}" (Đã sẵn sàng để tải lên).` 
         };
     } catch (error: any) {
         console.error("Google Drive Verification Error Detail:", error);

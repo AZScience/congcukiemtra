@@ -33,7 +33,7 @@ import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useCollection, useFirestore, useUser } from "@/firebase";
-import { EvidenceInput } from "@/components/monitoring/evidence-input";
+import { EvidenceInput } from "@/components/monitoring/evidence-input-v2";
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
 import {
   DropdownMenu,
@@ -275,6 +275,14 @@ const RequestEditDialog = ({ open, onOpenChange, mode, formData, setFormData, on
         feedback: true
     });
 
+    useEffect(() => {
+        if (open) {
+            setShowEvidence(Boolean(formData.attachments));
+        } else {
+            setShowEvidence(false);
+        }
+    }, [open, formData.attachments]);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-white border-none shadow-2xl">
@@ -412,7 +420,7 @@ const RequestEditDialog = ({ open, onOpenChange, mode, formData, setFormData, on
                                     <div className="space-y-3">
                                         <EvidenceInput 
                                             value={formData.attachments || ''} 
-                                            onChange={(v: string) => setFormData({...formData, attachments: v})} 
+                                            onChange={(v: string) => setFormData((prev: any) => ({...prev, attachments: v}))} 
                                         />
                                     </div>
                                 )}

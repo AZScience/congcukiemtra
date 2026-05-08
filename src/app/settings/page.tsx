@@ -8,7 +8,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { 
     Select, 
     SelectContent, 

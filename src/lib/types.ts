@@ -109,11 +109,13 @@ export type DocumentRecord = {
   assignee: string;
   urgency: 'Thường' | 'Khẩn' | 'Hỏa tốc';
   confidentiality: 'Thường' | 'Mật' | 'Tối mật';
-  status: 'Mới' | 'Đang xử lý' | 'Hoàn thành' | 'Quá hạn';
+  status: 'Mới' | 'Chờ duyệt' | 'Đã duyệt' | 'Cần bổ sung' | 'Ban hành';
   originalFile?: string;
   extractedText?: string;
   aiSummary?: string;
   keywords?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type BuildingBlock = {

@@ -171,10 +171,10 @@ export default function DocumentLookupPage() {
 
     const filteredItems = useMemo(() => {
         if (!rawData) return [];
-        const searchTerm = (filters.title || '').toLowerCase();
+        const searchTermLower = (searchTerm || '').toLowerCase();
         
-        // Only show results if at least one filter is active
-        const hasActiveFilters = searchTerm || selectedDocTypes.length > 0 || selectedDate;
+        // Chỉ hiển thị kết quả nếu có ít nhất một bộ lọc đang hoạt động
+        const hasActiveFilters = searchTermLower || selectedDocTypes.length > 0 || selectedDate;
         if (!hasActiveFilters) return [];
 
         return rawData.filter(item => {
@@ -187,7 +187,6 @@ export default function DocumentLookupPage() {
             if (selectedDate) {
                 if (!item.issueDate) return false;
                 try {
-                    // Normalize both to yyyy-MM-dd for comparison
                     const itemDate = new Date(item.issueDate);
                     const filterDate = new Date(selectedDate);
                     if (!isSameDay(itemDate, filterDate)) return false;
@@ -195,16 +194,15 @@ export default function DocumentLookupPage() {
             }
 
             // General Keyword Search based on scopes
-            if (searchTerm) {
-                // Advanced Pipe-separated multi-search
-                if (searchTerm.includes('|')) {
-                    const parts = searchTerm.split('|').map(p => p.trim().toLowerCase());
+            if (searchTermLower) {
+                if (searchTermLower.includes('|')) {
+                    const parts = searchTermLower.split('|').map(p => p.trim());
                     const orderedPossibleScopes = ['docNumber', 'title', 'abstract', 'extractedText', 'signer', 'issuingBody'];
                     const activeOrderedScopes = orderedPossibleScopes.filter(s => searchScopes.includes(s));
                     
                     const checkPart = (scope: string, index: number) => {
                         const part = parts[index];
-                        if (!part) return searchLogic === 'and'; // In AND mode, empty parts don't restrict. In OR, they don't help.
+                        if (!part) return searchLogic === 'and';
                         
                         const value = String(item[scope as keyof DocumentRecord] || '').toLowerCase();
                         if (searchMode === 'exact') return value === part;
@@ -217,11 +215,10 @@ export default function DocumentLookupPage() {
                     
                     if (!isMatch) return false;
                 } else {
-                    // Standard single-keyword search across all selected scopes
                     const matchesAnyScope = searchScopes.some(scope => {
                         const value = String(item[scope as keyof DocumentRecord] || '').toLowerCase();
-                        if (searchMode === 'exact') return value === searchTerm;
-                        return value.includes(searchTerm);
+                        if (searchMode === 'exact') return value === searchTermLower;
+                        return value.includes(searchTermLower);
                     });
                     if (!matchesAnyScope) return false;
                 }
@@ -233,7 +230,7 @@ export default function DocumentLookupPage() {
                 return String(item[k as keyof DocumentRecord] || '').toLowerCase().includes(String(v).toLowerCase());
             });
         });
-    }, [rawData, filters, searchScopes]);
+    }, [rawData, searchTerm, selectedDocTypes, selectedDate, searchMode, searchLogic, searchScopes, filters]);
 
     const sortedItems = useMemo(() => {
         let items = [...filteredItems];
@@ -420,8 +417,8 @@ export default function DocumentLookupPage() {
                                                 </div>
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="and" className="text-xs">Thỏa tất cả điều kiện</SelectItem>
-                                                <SelectItem value="or" className="text-xs">Thỏa một trong các điều kiện</SelectItem>
+                                                <SelectItem value="and" className="text-xs">Điều kiện và (and)</SelectItem>
+                                                <SelectItem value="or" className="text-xs">Điều kiện hoặc (or)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -455,177 +452,184 @@ export default function DocumentLookupPage() {
                         </Card>
 
                         {/* SPLIT VIEW CONTAINER */}
-                        <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 h-[750px] overflow-hidden">
-                            {/* LEFT: RESULTS LIST */}
-                            <div className="w-full md:w-[450px] flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <div className="px-4 py-3 bg-slate-50/50 border-b flex items-center justify-between shrink-0">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Danh sách kết quả ({sortedItems.length})</span>
-                                    <Select value={String(rowsPerPage)} onValueChange={v => {setRowsPerPage(Number(v)); setCurrentPage(1);}}>
-                                        <SelectTrigger className="h-7 w-20 text-[10px] bg-white border-slate-200"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="5">5 dòng</SelectItem><SelectItem value="10">10 dòng</SelectItem><SelectItem value="20">20 dòng</SelectItem><SelectItem value="50">50 dòng</SelectItem></SelectContent>
-                                    </Select>
-                                </div>
+                        {(searchTerm || selectedDocTypes.length > 0 || selectedDate) && (
+                            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 h-[750px] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* LEFT: RESULTS LIST */}
+                                <div className="w-full md:w-[450px] flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                    <div className="px-4 py-3 bg-slate-50/50 border-b flex items-center justify-between shrink-0">
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Danh sách kết quả ({sortedItems.length})</span>
+                                        <Select value={String(rowsPerPage)} onValueChange={v => {setRowsPerPage(Number(v)); setCurrentPage(1);}}>
+                                            <SelectTrigger className="h-7 w-20 text-[10px] bg-white border-slate-200"><SelectValue /></SelectTrigger>
+                                            <SelectContent><SelectItem value="5">5 dòng</SelectItem><SelectItem value="10">10 dòng</SelectItem><SelectItem value="20">20 dòng</SelectItem><SelectItem value="50">50 dòng</SelectItem></SelectContent>
+                                        </Select>
+                                    </div>
 
-                                <ScrollArea className="flex-1">
-                                    <div className="divide-y divide-slate-100">
-                                        {loading ? (
-                                            Array(5).fill(0).map((_, i) => (
-                                                <div key={i} className="p-4 space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
-                                            ))
-                                        ) : paginatedItems.length > 0 ? (
-                                            paginatedItems.map((item) => {
-                                                const fileInfo = getFileInfo(item.originalFile || '');
-                                                const Icon = fileInfo.icon;
-                                                const isActive = selectedDoc?.id === item.id;
-                                                return (
-                                                    <div 
-                                                        key={item.id} 
-                                                        className={cn("p-4 cursor-pointer transition-all border-l-4", isActive ? "bg-blue-50 border-primary" : "hover:bg-slate-50 border-transparent")}
-                                                        onClick={() => setSelectedDoc(item)}
-                                                    >
-                                                        <div className="flex items-start gap-3">
-                                                            <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm", isActive ? "bg-primary text-white" : "bg-slate-100 text-slate-500")}>
-                                                                <Icon className="h-5 w-5" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className={cn("text-sm font-bold truncate", isActive ? "text-primary" : "text-slate-800")}>{fileInfo.name}</h4>
-                                                                <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{item.title}</p>
-                                                                <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 font-medium">
-                                                                    <span className="flex items-center gap-1"><Hash className="h-3 w-3" /> {item.docNumber || 'N/A'}</span>
-                                                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {item.issueDate ? format(new Date(item.issueDate), 'dd/MM/yyyy') : '---'}</span>
-                                                                    <Badge variant="outline" className="px-1 py-0 h-3.5 text-[9px] bg-slate-50 text-slate-400 border-slate-200">{item.docType}</Badge>
+                                    <ScrollArea className="flex-1">
+                                        <div className="divide-y divide-slate-100">
+                                            {loading ? (
+                                                Array(5).fill(0).map((_, i) => (
+                                                    <div key={i} className="p-4 space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+                                                ))
+                                            ) : paginatedItems.length > 0 ? (
+                                                paginatedItems.map((item) => {
+                                                    const fileInfo = getFileInfo(item.originalFile || '');
+                                                    const Icon = fileInfo.icon;
+                                                    const isActive = selectedDoc?.id === item.id;
+                                                    return (
+                                                        <div 
+                                                            key={item.id} 
+                                                            className={cn("p-4 cursor-pointer transition-all border-l-4", isActive ? "bg-blue-50 border-primary" : "hover:bg-slate-50 border-transparent")}
+                                                            onClick={() => setSelectedDoc(item)}
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm", isActive ? "bg-primary text-white" : "bg-slate-100 text-slate-500")}>
+                                                                    <Icon className="h-5 w-5" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h4 className={cn("text-sm font-bold truncate", isActive ? "text-primary" : "text-slate-800")}>{fileInfo.name}</h4>
+                                                                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{item.title}</p>
+                                                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 font-medium">
+                                                                        <span className="flex items-center gap-1"><Hash className="h-3 w-3" /> {item.docNumber || 'N/A'}</span>
+                                                                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {item.issueDate ? format(new Date(item.issueDate), 'dd/MM/yyyy') : '---'}</span>
+                                                                        <Badge variant="outline" className="px-1 py-0 h-3.5 text-[9px] bg-slate-50 text-slate-400 border-slate-200">{item.docType}</Badge>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="p-12 text-center text-slate-400">
+                                                    <div className="mx-auto w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                                                        <X className="h-6 w-6 opacity-20" />
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="p-12 text-center text-slate-400"><p className="text-sm italic">Không tìm thấy văn bản phù hợp</p></div>
-                                        )}
-                                    </div>
-                                </ScrollArea>
-                                {/* PAGINATION FOOTER (LEFT PANEL) */}
-                                <div className="p-3 border-t bg-slate-50/50 flex items-center justify-between gap-2 shrink-0">
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)}><ChevronsLeft className="h-4 w-4" /></Button>
-                                        <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(safeCurrentPage - 1)}><ChevronLeft className="h-4 w-4" /></Button>
-                                    </div>
-                                    <div className="text-[11px] font-bold text-slate-500">Trang {safeCurrentPage}/{totalPages}</div>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(safeCurrentPage + 1)}><ChevronRight className="h-4 w-4" /></Button>
-                                        <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(totalPages)}><ChevronsRight className="h-4 w-4" /></Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* RIGHT: DOCUMENT PREVIEW (Finder Style) */}
-                            <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm relative">
-                                {selectedDoc ? (
-                                    <div className="flex-1 flex flex-col">
-                                        {/* PREVIEW HEADER */}
-                                        <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50/30 shrink-0">
-                                            <div className="flex items-center gap-4 min-w-0">
-                                                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center text-primary shadow-inner shrink-0">
-                                                    {(() => { const info = getFileInfo(selectedDoc.originalFile || ''); const I = info.icon; return <I className="h-5 w-5" />; })()}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <h3 className="text-base font-bold text-slate-800 truncate leading-tight" title={selectedDoc.title}>{selectedDoc.title}</h3>
-                                                    <div className="flex items-center gap-4 mt-1">
-                                                        <span className="text-xs text-slate-500 font-medium">{selectedDoc.issuingBody}</span>
-                                                        <span className="text-[10px] text-slate-300">|</span>
-                                                        <span className="text-xs text-slate-500 font-medium">Ký bởi: {selectedDoc.signer}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => setFullPreviewDoc(selectedDoc)}>
-                                                            <Maximize2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>Xem toàn màn hình</TooltipContent>
-                                                </Tooltip>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
-                                                            <ExternalLink className="h-4 w-4" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>Mở trong cửa sổ mới</TooltipContent>
-                                                </Tooltip>
-                                                <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
-                                                    <FileDown className="h-4 w-4" /> Tải về
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400" onClick={() => setSelectedDoc(null)}>
-                                                    <X className="h-5 w-5" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* PREVIEW CONTENT */}
-                                        <div className="flex-1 bg-slate-100/50 p-6 flex flex-col overflow-hidden">
-                                            {selectedDoc.originalFile ? (() => {
-                                                const url = selectedDoc.originalFile;
-                                                const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
-                                                const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '');
-                                                const isPdf = ext === 'pdf';
-
-                                                return (
-                                                    <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-                                                        {isImage ? (
-                                                            <ScrollArea className="w-full h-full">
-                                                                <div className="p-8 flex justify-center">
-                                                                    <img src={url} alt="Preview" className="max-w-full shadow-2xl rounded" />
-                                                                </div>
-                                                            </ScrollArea>
-                                                        ) : isPdf ? (
-                                                            <iframe src={`${url}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
-                                                        ) : (
-                                                            <ScrollArea className="w-full h-full">
-                                                                <div className="flex flex-col items-center gap-6 p-12 pt-[10vh] pb-24 text-center">
-                                                                    <div className="h-24 w-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 shrink-0">
-                                                                        <LinkIcon className="h-12 w-12" />
-                                                                    </div>
-                                                                    <div className="max-w-md space-y-2">
-                                                                        <p className="text-lg font-bold text-slate-800">Không thể xem trực tiếp</p>
-                                                                        <p className="text-sm text-slate-500">Văn bản này ở định dạng không hỗ trợ xem trực tiếp hoặc là một liên kết bên ngoài.</p>
-                                                                    </div>
-                                                                    <Button className="h-11 px-8 gap-2 shadow-lg shrink-0 mb-8" onClick={() => window.open(url, '_blank')}>
-                                                                        <Eye className="h-4 w-4" /> Mở trong tab mới
-                                                                    </Button>
-                                                                </div>
-                                                            </ScrollArea>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })() : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
-                                                    <div className="h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
-                                                        <FileDown className="h-10 w-10 opacity-20" />
-                                                    </div>
-                                                    <p className="text-sm italic">Văn bản này không có file đính kèm</p>
+                                                    <p className="text-sm italic">Không tìm thấy văn bản phù hợp</p>
                                                 </div>
                                             )}
                                         </div>
+                                    </ScrollArea>
+                                    {/* PAGINATION FOOTER (LEFT PANEL) */}
+                                    <div className="p-3 border-t bg-slate-50/50 flex items-center justify-between gap-2 shrink-0">
+                                        <div className="flex items-center gap-1">
+                                            <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(1)}><ChevronsLeft className="h-4 w-4" /></Button>
+                                            <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === 1} onClick={() => setCurrentPage(safeCurrentPage - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                                        </div>
+                                        <div className="text-[11px] font-bold text-slate-500">Trang {safeCurrentPage}/{totalPages}</div>
+                                        <div className="flex items-center gap-1">
+                                            <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(safeCurrentPage + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                                            <Button variant="outline" size="icon" className="h-8 w-8 bg-white border-slate-200" disabled={safeCurrentPage === totalPages} onClick={() => setCurrentPage(totalPages)}><ChevronsRight className="h-4 w-4" /></Button>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
-                                        <div className="relative mb-8">
-                                            <div className="h-32 w-32 bg-white rounded-full flex items-center justify-center shadow-xl border border-slate-100">
-                                                <FileText className="h-16 w-16 text-slate-100" />
+                                </div>
+
+                                {/* RIGHT: DOCUMENT PREVIEW (Finder Style) */}
+                                <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm relative">
+                                    {selectedDoc ? (
+                                        <div className="flex-1 flex flex-col">
+                                            {/* PREVIEW HEADER */}
+                                            <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50/30 shrink-0">
+                                                <div className="flex items-center gap-4 min-w-0">
+                                                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center text-primary shadow-inner shrink-0">
+                                                        {(() => { const info = getFileInfo(selectedDoc.originalFile || ''); const I = info.icon; return <I className="h-5 w-5" />; })()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h3 className="text-base font-bold text-slate-800 truncate leading-tight" title={selectedDoc.title}>{selectedDoc.title}</h3>
+                                                        <div className="flex items-center gap-4 mt-1">
+                                                            <span className="text-xs text-slate-500 font-medium">{selectedDoc.issuingBody}</span>
+                                                            <span className="text-[10px] text-slate-300">|</span>
+                                                            <span className="text-xs text-slate-500 font-medium">Ký bởi: {selectedDoc.signer}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => setFullPreviewDoc(selectedDoc)}>
+                                                                <Maximize2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Xem toàn màn hình</TooltipContent>
+                                                    </Tooltip>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
+                                                                <ExternalLink className="h-4 w-4" />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Mở trong cửa sổ mới</TooltipContent>
+                                                    </Tooltip>
+                                                    <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
+                                                        <FileDown className="h-4 w-4" /> Tải về
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400" onClick={() => setSelectedDoc(null)}>
+                                                        <X className="h-5 w-5" />
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <div className="absolute -bottom-2 -right-2 h-12 w-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg animate-bounce">
-                                                <ChevronLeft className="h-6 w-6 rotate-180" />
+
+                                            {/* PREVIEW CONTENT */}
+                                            <div className="flex-1 bg-slate-100/50 p-6 flex flex-col overflow-hidden">
+                                                {selectedDoc.originalFile ? (() => {
+                                                    const url = selectedDoc.originalFile;
+                                                    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+                                                    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '');
+                                                    const isPdf = ext === 'pdf';
+
+                                                    return (
+                                                        <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                                                            {isImage ? (
+                                                                <ScrollArea className="w-full h-full">
+                                                                    <div className="p-8 flex justify-center">
+                                                                        <img src={url} alt="Preview" className="max-w-full shadow-2xl rounded" />
+                                                                    </div>
+                                                                </ScrollArea>
+                                                            ) : isPdf ? (
+                                                                <iframe src={`${url}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
+                                                            ) : (
+                                                                <ScrollArea className="w-full h-full">
+                                                                    <div className="flex flex-col items-center gap-6 p-12 pt-[10vh] pb-24 text-center">
+                                                                        <div className="h-24 w-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 shrink-0">
+                                                                            <LinkIcon className="h-12 w-12" />
+                                                                        </div>
+                                                                        <div className="max-w-md space-y-2">
+                                                                            <p className="text-lg font-bold text-slate-800">Không thể xem trực tiếp</p>
+                                                                            <p className="text-sm text-slate-500">Văn bản này ở định dạng không hỗ trợ xem trực tiếp hoặc là một liên kết bên ngoài.</p>
+                                                                        </div>
+                                                                        <Button className="h-11 px-8 gap-2 shadow-lg shrink-0 mb-8" onClick={() => window.open(url, '_blank')}>
+                                                                            <Eye className="h-4 w-4" /> Mở trong tab mới
+                                                                        </Button>
+                                                                    </div>
+                                                                </ScrollArea>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })() : (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
+                                                        <div className="h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
+                                                            <FileDown className="h-10 w-10 opacity-20" />
+                                                        </div>
+                                                        <p className="text-sm italic">Văn bản này không có file đính kèm</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Chọn văn bản để xem nội dung</h3>
-                                        <p className="text-slate-500 max-w-sm">Chọn một mục từ danh sách bên trái để xem trước nội dung văn bản trực tiếp tại đây.</p>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
+                                            <div className="relative mb-8">
+                                                <div className="h-32 w-32 bg-white rounded-full flex items-center justify-center shadow-xl border border-slate-100">
+                                                    <FileText className="h-16 w-16 text-slate-100" />
+                                                </div>
+                                                <div className="absolute -bottom-2 -right-2 h-12 w-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg animate-bounce">
+                                                    <ChevronLeft className="h-6 w-6 rotate-180" />
+                                                </div>
+                                            </div>
+                                            <h3 className="text-xl font-bold text-slate-800 mb-2">Chọn văn bản để xem nội dung</h3>
+                                            <p className="text-slate-500 max-w-sm">Chọn một mục từ danh sách bên trái để xem trước nội dung văn bản trực tiếp tại đây.</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
                 {/* FULL SCREEN PREVIEW DIALOG */}

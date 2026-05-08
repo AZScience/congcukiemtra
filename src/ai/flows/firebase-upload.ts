@@ -1,75 +1,106 @@
 'use server';
 
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getStorage } from 'firebase-admin/storage';
+import { JWT } from 'google-auth-library';
+import crypto from 'crypto';
 
 export async function uploadToFirebaseServer(formData: FormData) {
     try {
         const file = formData.get('file') as File;
+        const fileName = file?.name || `file_${Date.now()}`;
         const privateKey = formData.get('privateKey') as string;
         const clientEmail = formData.get('clientEmail') as string;
         const projectId = formData.get('projectId') as string;
-        const storageBucket = formData.get('storageBucket') as string;
+        const storageBucket = formData.get('storageBucket') as string || 'kiemtranoibo-ccks.firebasestorage.app';
 
         if (!file || !privateKey || !clientEmail || !projectId) {
-            throw new Error("Thiếu thông tin cấu hình Firebase Admin.");
+            throw new Error("Thiếu thông tin cấu hình Firebase/Google Cloud.");
         }
 
-        // Làm sạch Private Key
-        const cleanKey = privateKey.replace(/\\n/g, '\n');
+        // 1. Khởi tạo JWT Auth
+        const auth = new JWT({
+            email: clientEmail,
+            key: privateKey.replace(/\\n/g, '\n'),
+            scopes: ['https://www.googleapis.com/auth/devstorage.full_control'],
+        });
 
-        // Khởi tạo Admin SDK (chỉ khởi tạo 1 lần)
-        const apps = getApps();
-        let app;
-        if (apps.length === 0) {
-            app = initializeApp({
-                credential: cert({
-                    projectId: projectId,
-                    clientEmail: clientEmail,
-                    privateKey: cleanKey,
-                }),
-                storageBucket: storageBucket || `${projectId}.appspot.com`
-            });
-        } else {
-            app = apps[0];
-        }
+        const { token } = await auth.getAccessToken();
+        if (!token) throw new Error("Không thể lấy Access Token từ Service Account.");
 
+        // Ưu tiên các bucket đã xác định là hoạt động tốt
         const bucketNames = [
+            'kiemtranoibo-ccks.firebasestorage.app',
             storageBucket,
-            `${projectId}.firebasestorage.app`,
-            `${projectId}.appspot.com`
-        ].filter(Boolean);
+            'kiemtranoibo-ccks.appspot.com',
+            'kiemtranoibo-493603.appspot.com',
+        ].filter((v, i, a) => v && a.indexOf(v) === i);
 
+        const buffer = Buffer.from(await file.arrayBuffer());
         let lastError = null;
+        const safeFileName = `${Date.now()}_${fileName}`;
+        const downloadToken = crypto.randomUUID();
+
         for (const bName of bucketNames) {
             try {
-                const bucket = getStorage(app).bucket(bName as string);
-                const buffer = Buffer.from(await file.arrayBuffer());
+                console.log(`>>> Đang thử tải lên Bucket: ${bName} (với Firebase Token)...`);
                 
-                const fileName = `evidence/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-                const blob = bucket.file(fileName);
+                // Sử dụng Multipart Upload để đính kèm Metadata (Firebase Token)
+                const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bName}/o?uploadType=multipart&name=${encodeURIComponent(safeFileName)}`;
+                
+                const metadata = {
+                    contentType: file.type || 'application/octet-stream',
+                    metadata: {
+                        firebaseStorageDownloadTokens: downloadToken
+                    }
+                };
 
-                await blob.save(buffer, {
-                    metadata: { contentType: file.type },
+                const boundary = 'foo_bar_baz';
+                const multipartBody = Buffer.concat([
+                    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`),
+                    buffer,
+                    Buffer.from(`\r\n--${boundary}--`)
+                ]);
+
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`,
+                    },
+                    body: multipartBody,
                 });
 
-                const [url] = await blob.getSignedUrl({
-                    action: 'read',
-                    expires: '03-01-2036', 
-                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.warn(`Thử bucket ${bName} thất bại:`, errorText);
+                    lastError = errorText;
+                    continue;
+                }
 
-                return { success: true, url };
+                console.log(`Tải lên Bucket ${bName} THÀNH CÔNG!`);
+                
+                // Tạo Firebase Download URL chuẩn (Bypass 403)
+                const firebaseUrl = `https://firebasestorage.googleapis.com/v0/b/${bName}/o/${encodeURIComponent(safeFileName)}?alt=media&token=${downloadToken}`;
+                console.log(`Firebase URL: ${firebaseUrl}`);
+
+                return {
+                    success: true,
+                    url: firebaseUrl,
+                    fileName: safeFileName,
+                    bucketUsed: bName
+                };
             } catch (err: any) {
-                lastError = err;
-                console.warn(`Thử bucket ${bName} thất bại, đang thử cái tiếp theo...`);
+                lastError = err.message;
                 continue;
             }
         }
 
-        throw lastError || new Error("Không thể tìm thấy bucket Storage hợp lệ.");
+        throw new Error(lastError || "Không thể tải lên bất kỳ bucket nào.");
 
     } catch (error: any) {
-        console.error("Firebase Admin Upload Error:", error);
-        return { success: false, error: error.message };
+        console.error("Lỗi REST API Upload:", error.message);
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }

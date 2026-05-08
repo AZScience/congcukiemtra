@@ -28,7 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import type { AssetReception, BuildingBlock, Employee } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { EvidenceInput } from "@/components/monitoring/evidence-input";
+import { EvidenceInput } from "@/components/monitoring/evidence-input-v2";
 import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -332,7 +332,7 @@ const EditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSave, o
                                             <EvidenceInput value={formData.evidence || ''} onChange={() => {}} />
                                         </div>
                                     ) : (
-                                        <EvidenceInput value={formData.evidence || ''} onChange={v => setFormData({...formData, evidence: v})} />
+                                        <EvidenceInput value={formData.evidence || ''} onChange={v => setFormData((prev: any) => ({...prev, evidence: v}))} />
                                     )}
                                 </div>
                             </div>

@@ -137,21 +137,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <FirebaseClientProvider>
             <SystemParametersProvider>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    <LanguageProvider>
-                        <MasterDataProvider>
-                            <ClientOnly>
+                <LanguageProvider>
+                    <MasterDataProvider>
+                        <ClientOnly>
+                            <ThemeProvider
+                                attribute="class"
+                                defaultTheme="light"
+                            >
                                 <RootLayoutContent>{children}</RootLayoutContent>
                                 <Toaster />
-                            </ClientOnly>
-                        </MasterDataProvider>
-                    </LanguageProvider>
-                </ThemeProvider>
+                            </ThemeProvider>
+                        </ClientOnly>
+                    </MasterDataProvider>
+                </LanguageProvider>
             </SystemParametersProvider>
         </FirebaseClientProvider>
     );

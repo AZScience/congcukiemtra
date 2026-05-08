@@ -15,24 +15,20 @@ export function initializeFirebase(config: FirebaseOptions = firebaseConfig) {
   
   let firestore;
   try {
-    // Attempt to initialize with specific settings
+    // Attempt to initialize with specific settings to bypass network issues
     firestore = initializeFirestore(app, {
       experimentalForceLongPolling: true,
-      // @ts-ignore - Some versions need this to avoid conflicting with forceLongPolling
-      experimentalAutoDetectLongPolling: false,
-      // @ts-ignore - newer firebase versions support this to fix connectivity issues
-      useFetchStreams: false,
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
+      // Disabling cache temporarily to fix potential corruption issues causing hangs
+      // localCache: persistentLocalCache({
+      //   tabManager: persistentMultipleTabManager()
+      // })
     });
   } catch (e: any) {
-    // If already initialized (common during HMR), use getFirestore
-    // Note: Settings cannot be changed after initialization
+    console.warn("Firestore initialization warning:", e.message);
     firestore = getFirestore(app);
   }
   
-  const storage = getStorage(app, `gs://${config.storageBucket}`);
+  const storage = getStorage(app, config.storageBucket);
 
   firebaseInstance = { app, auth, firestore, storage };
   return firebaseInstance;

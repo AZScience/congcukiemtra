@@ -25,10 +25,10 @@ import { useLanguage } from "@/hooks/use-language";
 import { DataTableEmptyState } from "@/components/data-table-empty-state";
 import { useCollection, useFirestore, useUser } from "@/firebase";
 import { useMasterData } from "@/providers/master-data-provider";
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc, query, where } from "firebase/firestore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { EvidenceInput } from "@/components/monitoring/evidence-input";
+import { EvidenceInput } from "@/components/monitoring/evidence-input-v2";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -469,7 +469,7 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="pt-2 pb-4">
-                                            <EvidenceInput value={formData.evidence || ''} onChange={v => setFormData({...formData, evidence: v})} />
+                                            <EvidenceInput value={formData.evidence || ''} onChange={v => setFormData((prev: any) => ({...prev, evidence: v}))} />
                                         </AccordionContent>
                                     </AccordionItem>
                                 </>
@@ -508,7 +508,28 @@ export default function ExternalPracticePage() {
     } = useMasterData();
     const { permissions } = usePermissions('/monitoring/external-practice') as any;
 
-    const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
+    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+    const [advancedFilters, setAdvancedFilters] = useLocalStorage<any>('ext_practice_adv_filters_v1', {
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        departments: [],
+        lecturers: [],
+        buildings: [],
+        rooms: [],
+        periodSession: 'all',
+        periodStart: '',
+        periodEnd: ''
+    });
+
+    const schedulesRef = useMemo(() => {
+        if (!firestore) return null;
+        let fDate = advancedFilters.date || '';
+        if (fDate.includes('-')) {
+            const [y, m, d] = fDate.split('-');
+            fDate = `${d}/${m}/${y}`;
+        }
+        return query(collection(firestore, 'schedules'), where('date', '==', fDate));
+    }, [firestore, advancedFilters.date]);
+    
     const { data: schedulesData, loading: schedulesLoading } = useCollection<DailySchedule>(schedulesRef);
     
     // Find the recognition ID for "Thực hành ngoài"
@@ -535,17 +556,6 @@ export default function ExternalPracticePage() {
         .map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[];
     }, [schedulesData]);
 
-    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
-    const [advancedFilters, setAdvancedFilters] = useLocalStorage<any>('ext_practice_adv_filters_v1', {
-        date: format(new Date(), 'yyyy-MM-dd'), 
-        departments: [],
-        lecturers: [],
-        buildings: [],
-        rooms: [],
-        periodSession: 'all',
-        periodStart: '',
-        periodEnd: ''
-    });
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

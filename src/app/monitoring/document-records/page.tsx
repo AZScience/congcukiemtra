@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { uploadToFirebaseServer } from "@/ai/flows/firebase-upload";
+import { uploadToGoogleDrive } from "@/ai/flows/google-drive-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -37,14 +39,16 @@ import { Separator } from "@/components/ui/separator";
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
-import { useCollection, useFirestore, useStorage, useUser } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { firebaseConfig } from "@/firebase/config";
+import { useCollection, useFirestore, useUser, useFirebaseApp, useStorage } from "@/firebase";
+import { collection, doc, setDoc, deleteDoc, getDoc, query, where, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSystemParameters } from "@/providers/system-parameters-provider";
 import { Badge } from "@/components/ui/badge";
 import type { DocumentRecord, DocumentType, Department, Employee } from '@/lib/types';
 import { DataTableEmptyState } from "@/components/data-table-empty-state";
@@ -193,9 +197,39 @@ const MultiSelectCombobox = ({ options, selected, onChange, placeholder, t }: { 
 
 export default function DocumentRecordsPage() {
     const { t } = useLanguage();
+    const { params: systemParams } = useSystemParameters();
     const firestore = useFirestore();
+    const firebaseApp = useFirebaseApp();
+    const storage = useStorage();
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const collectionRef = useMemo(() => (firestore ? collection(firestore, 'document_records') : null), [firestore]);
+    
+    const [currentPage, setCurrentPage] = useLocalStorage('doc_records_page_v1', 1);
+    const [rowsPerPage, setRowsPerPage] = useLocalStorage('doc_records_rows_v1', 10);
+    const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('doc_records_colVis_v1', { 
+        docCode: true, docNumber: true, title: true, docType: true, issueDate: true, status: true, urgency: true 
+    });
+    const [filters, setFilters] = useLocalStorage<any>('doc_records_filters_v1', {});
+    
+    const hasActiveFilter = useMemo(() => {
+        return Object.values(filters).some(v => v !== undefined && v !== '' && v !== null);
+    }, [filters]);
+
+    const collectionRef = useMemo(() => {
+        if (!firestore) return null;
+        let q = query(collection(firestore, 'document_records'));
+        
+        if (filters.startDate) {
+            q = query(q, where('receivedDate', '>=', filters.startDate));
+        }
+        if (filters.endDate) {
+            q = query(q, where('receivedDate', '<=', filters.endDate));
+        }
+        
+        q = query(q, orderBy('receivedDate', 'desc'), limit(100));
+        
+        return q;
+    }, [firestore, filters]);
+
     const docTypesRef = useMemo(() => (firestore ? collection(firestore, 'document_types') : null), [firestore]);
     const departmentsRef = useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]);
     const employeesRef = useMemo(() => (firestore ? collection(firestore, 'employees') : null), [firestore]);
@@ -220,12 +254,6 @@ export default function DocumentRecordsPage() {
     const { toast } = useToast();
     const [dialogMode, setDialogMode] = useState<DialogMode>('add');
     
-    const [currentPage, setCurrentPage] = useLocalStorage('doc_records_page_v1', 1);
-    const [rowsPerPage, setRowsPerPage] = useLocalStorage('doc_records_rows_v1', 10);
-    const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('doc_records_colVis_v1', { 
-        docCode: true, docNumber: true, title: true, docType: true, issueDate: true, status: true, urgency: true 
-    });
-    const [filters, setFilters] = useLocalStorage<any>('doc_records_filters_v1', {});
     const [sortConfig, setSortConfig] = useLocalStorage<any[]>('doc_records_sort_v1', [{ key: 'receivedDate', direction: 'descending' }]);
     const [openPopover, setOpenPopover] = useState<string | null>(null);
     const [selectedRowIds, setSelectedRowIds] = useLocalStorage<string[]>('doc_records_selected_ids_v1', []);
@@ -352,7 +380,6 @@ export default function DocumentRecordsPage() {
         setFormData(activeData); setInitialFormState(activeData); setIsEditDialogOpen(true);
     };
 
-    const storage = useStorage();
     const [isUploading, setIsUploading] = useState(false);
     const [isExtracting, setIsExtracting] = useState(false);
 
@@ -382,28 +409,103 @@ export default function DocumentRecordsPage() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !storage) return;
+        if (!file || !storage || !firebaseApp) return;
         const allowedExtensions = ['pdf', 'docx', 'doc', 'xlsx', 'txt', 'png', 'jpg', 'jpeg', 'zip', 'rar'];
         const extension = file.name.split('.').pop()?.toLowerCase() || '';
         if (!allowedExtensions.includes(extension)) {
             toast({ title: t("Lỗi định dạng"), description: t("Hỗ trợ: PDF, DOCX, XLSX, TXT, PNG, JPG, ZIP, RAR"), variant: "destructive" });
             return;
         }
+        const serviceAccountEmail = (systemParams.evidenceServiceAccountEmail || systemParams.googleServiceAccountEmail || "").trim();
+        const privateKey = (systemParams.evidencePrivateKey || systemParams.googlePrivateKey || "");
+        const driveFolderId = (systemParams.evidenceGoogleDriveFolderId || systemParams.googleDriveFolderId || "").trim();
+        if (!serviceAccountEmail || !privateKey) {
+            toast({
+                title: "Loi cau hinh",
+                description: "Chua cau hinh Service Account trong tab Minh chung. He thong da dung fallback client de tranh loi timeout.",
+                variant: "destructive"
+            });
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
         setIsUploading(true);
-        const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+        console.log("Starting upload process for:", file.name);
+        
         try {
-            const uploadPromise = uploadBytes(storageRef, file);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 90000));
-            await Promise.race([uploadPromise, timeoutPromise]);
-            const url = await getDownloadURL(storageRef);
-            setFormData(prev => ({ ...prev, originalFile: url }));
-            toast({ title: t("Tải lên thành công"), description: file.name });
-            triggerAIExtraction(file.name);
+            const uploadTimeout = 20000; // 20 seconds
+            let url = '';
+
+            // --- 1. TRY CLIENT-SIDE UPLOAD (with timeout) ---
+            try {
+                console.log("Attempting client-side Firebase upload...");
+                const clientUploadPromise = (async () => {
+                    const storageRef = ref(storage, `evidence/${Date.now()}_${file.name}`);
+                    const uploadResult = await uploadBytes(storageRef, file);
+                    return await getDownloadURL(uploadResult.ref);
+                })();
+
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Client-side upload timeout")), uploadTimeout)
+                );
+
+                url = await Promise.race([clientUploadPromise, timeoutPromise]) as string;
+                console.log("Client-side upload successful:", url);
+            } catch (clientError: any) {
+                console.warn("Client-side upload failed or timed out:", clientError.message);
+                
+                // --- 2. FALLBACK TO SERVER-SIDE FIREBASE UPLOAD ---
+                console.log("Attempting server-side Firebase upload...");
+                const serverFormData = new FormData();
+                serverFormData.append('file', file);
+                serverFormData.append('clientEmail', serviceAccountEmail);
+                serverFormData.append('privateKey', privateKey);
+                serverFormData.append('projectId', firebaseConfig.projectId || '');
+                serverFormData.append('storageBucket', firebaseConfig.storageBucket || '');
+
+                const result = await uploadToFirebaseServer(serverFormData);
+                if (result.success && result.url) {
+                    url = result.url;
+                    console.log("Server-side upload successful:", url);
+                } else {
+                    console.warn("Server-side upload failed:", result.error);
+                    
+                    // --- 3. FALLBACK TO GOOGLE DRIVE ---
+                // Fallback to Drive if server-side upload fails for ANY reason
+                if (driveFolderId && !result.success) {
+                        console.log("Attempting Google Drive upload...");
+                        const driveFormData = new FormData();
+                        driveFormData.append('file', file);
+                        driveFormData.append('folderId', driveFolderId);
+                        driveFormData.append('serviceAccountEmail', serviceAccountEmail);
+                        driveFormData.append('privateKey', privateKey);
+
+                        const driveResult = await uploadToGoogleDrive(driveFormData);
+                        if (driveResult.success && driveResult.url) {
+                            url = driveResult.url;
+                            console.log("Google Drive upload successful:", url);
+                            toast({ title: t("Tải lên thành công"), description: `${file.name} (Google Drive)` });
+                        } else {
+                            console.error("Google Drive upload failed:", driveResult.error);
+                            throw new Error(driveResult.error || result.error || 'All upload methods failed');
+                        }
+                    } else {
+                        throw new Error(result.error || 'Server upload failed');
+                    }
+                }
+            }
+
+            if (url) {
+                setFormData(prev => ({ ...prev, originalFile: url }));
+                if (!url.includes('drive.google.com')) {
+                    toast({ title: t("Tải lên thành công"), description: file.name });
+                }
+                triggerAIExtraction(file.name);
+            }
         } catch (error: any) {
-            const isTimeout = error.message === "Timeout";
+            console.error("Critical Upload Error:", error);
             toast({ 
-                title: isTimeout ? t("Lỗi kết nối") : t("Lỗi tải lên"), 
-                description: isTimeout ? t("Quá thời gian kết nối (90s). Vui lòng kiểm tra lại đường truyền hoặc thử lại.") : t("Không thể tải file lên Storage."), 
+                title: t("Lỗi tải lên"), 
+                description: error?.message || t("Không thể tải file lên. Vui lòng kiểm tra lại cấu hình hoặc kết nối mạng."), 
                 variant: "destructive" 
             });
         } finally {
@@ -414,9 +516,36 @@ export default function DocumentRecordsPage() {
 
     const handleSave = async () => {
         if (!firestore) return;
-        const id = (dialogMode === 'edit' || dialogMode === 'view') && selectedItem ? selectedItem.id : (formData.id || doc(collection(firestore, 'document_records')).id);
-        await setDoc(doc(firestore, "document_records", id), { ...formData, id }, { merge: true });
-        setIsEditDialogOpen(false); toast({ title: t("Thành công") });
+        try {
+            const id = (dialogMode === 'edit' || dialogMode === 'view') && selectedItem ? selectedItem.id : (formData.id || doc(collection(firestore, 'document_records')).id);
+            const finalData = { 
+                ...formData, 
+                id,
+                updatedAt: new Date().toISOString(),
+                createdAt: formData.createdAt || new Date().toISOString()
+            };
+            
+            await setDoc(doc(firestore, "document_records", id), finalData, { merge: true });
+            
+            setIsEditDialogOpen(false);
+            toast({ 
+                title: t("Thành công"), 
+                description: dialogMode === 'add' ? t("Đã thêm hồ sơ mới") : t("Đã cập nhật hồ sơ") 
+            });
+
+            // Nếu thêm mới, tự động xóa bộ lọc để người dùng thấy ngay hồ sơ vừa tạo
+            if (dialogMode === 'add') {
+                setFilters({});
+                setCurrentPage(1);
+            }
+        } catch (error: any) {
+            console.error("Save Error:", error);
+            toast({ 
+                title: t("Lỗi khi lưu"), 
+                description: error.message || t("Không thể lưu hồ sơ. Vui lòng thử lại."), 
+                variant: "destructive" 
+            });
+        }
     };
 
     const handleExport = () => {
@@ -478,6 +607,21 @@ export default function DocumentRecordsPage() {
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-xl flex items-center gap-2"><FolderArchive className="h-6 w-6 text-primary" />{t('Quản lý hồ sơ')}</CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {hasActiveFilter && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button 
+                                                    onClick={() => { setFilters({}); setCurrentPage(1); }} 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="text-red-500 hover:bg-red-50"
+                                                >
+                                                    <X className="h-5 w-5" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>{t('Xóa tất cả tìm kiếm')}</p></TooltipContent>
+                                        </Tooltip>
+                                    )}
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
                                     {permissions.export && (
                                         <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
@@ -516,32 +660,40 @@ export default function DocumentRecordsPage() {
                                             <TableRow><TableCell colSpan={15} className="text-center h-40"><div className="flex flex-col items-center justify-center gap-2"><Cog className="h-8 w-8 animate-spin text-primary opacity-50" /><p className="text-muted-foreground">{t('Đang tải dữ liệu...')}</p></div></TableCell></TableRow>
                                         ) : error ? (
                                             <TableRow><TableCell colSpan={15} className="text-center h-40"><div className="flex flex-col items-center justify-center gap-2 text-destructive"><Ban className="h-8 w-8 opacity-50" /><p className="font-bold">{t('Lỗi truy cập dữ liệu')}</p><Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2"><Undo2 className="mr-2 h-4 w-4" /> {t('Thử lại')}</Button></div></TableCell></TableRow>
-                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => (
-                                            <TableRow key={item.renderId} className={cn("cursor-pointer transition-colors hover:bg-slate-50", selectedSet.has(item.renderId) && "bg-blue-50/50")} onClick={() => handleRowClick(item.renderId)}>
-                                                <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
-                                                {Object.keys(columnDefs).filter(k => columnVisibility[k]).map(columnKey => (
-                                                    <TableCell key={columnKey} className="border-r">
-                                                        {columnKey === 'status' ? <StatusBadge status={item.status} t={t} /> : 
-                                                         columnKey === 'urgency' ? <UrgencyBadge urgency={item.urgency} t={t} /> :
-                                                         columnKey === 'confidentiality' ? <ConfidentialityBadge confidentiality={item.confidentiality} t={t} /> :
-                                                         columnKey === 'title' ? <span className="font-bold text-slate-800 line-clamp-2">{item.title}</span> :
-                                                         columnKey === 'docCode' ? <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-[11px]">{item.docCode}</code> :
-                                                         <span className="text-slate-600">{(item as any)[columnKey] || '---'}</span>}
+                                        ) : currentItems.length === 0 ? (
+                                            <DataTableEmptyState 
+                                                colSpan={15}
+                                                title={t('Không có dữ liệu')} 
+                                                description={t('Chưa có hồ sơ văn bản nào được ghi nhận hoặc không tìm thấy kết quả phù hợp.')}
+                                                filters={filters}
+                                                onClearFilters={() => setFilters({})}
+                                            />
+                                        ) : (
+                                            currentItems.map((item, idx) => (
+                                                <TableRow key={item.renderId} className={cn("cursor-pointer transition-colors hover:bg-slate-50", selectedSet.has(item.renderId) && "bg-blue-50/50")} onClick={() => handleRowClick(item.renderId)}>
+                                                    <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
+                                                    {Object.keys(columnDefs).filter(k => columnVisibility[k]).map(columnKey => (
+                                                        <TableCell key={columnKey} className="border-r">
+                                                            {columnKey === 'status' ? <StatusBadge status={item.status} t={t} /> : 
+                                                             columnKey === 'urgency' ? <UrgencyBadge urgency={item.urgency} t={t} /> :
+                                                             columnKey === 'confidentiality' ? <ConfidentialityBadge confidentiality={item.confidentiality} t={t} /> :
+                                                             columnKey === 'title' ? <span className="font-bold text-slate-800 line-clamp-2">{item.title}</span> :
+                                                             columnKey === 'docCode' ? <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-[11px]">{item.docCode}</code> :
+                                                             <span className="text-slate-600">{(item as any)[columnKey] || '---'}</span>}
+                                                        </TableCell>
+                                                    ))}
+                                                    <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm border-l p-0 text-center">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('view', item); }}><Eye className="mr-2 h-4 w-4" /> Xem chi tiết</DropdownMenuItem>
+                                                                {permissions.edit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('edit', item); }}><Edit className="mr-2 h-4 w-4" /> Chỉnh sửa</DropdownMenuItem>}
+                                                                {permissions.delete && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Xoá</DropdownMenuItem>}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </TableCell>
-                                                ))}
-                                                <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm border-l p-0 text-center">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('view', item); }}><Eye className="mr-2 h-4 w-4" /> Xem chi tiết</DropdownMenuItem>
-                                                            {permissions.edit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('edit', item); }}><Edit className="mr-2 h-4 w-4" /> Chỉnh sửa</DropdownMenuItem>}
-                                                            {permissions.delete && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Xoá</DropdownMenuItem>}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        )) : (
-                                            <DataTableEmptyState colSpan={15} icon={FolderArchive} title={t('Không tìm thấy hồ sơ')} filters={filters} onClearFilters={() => {setFilters({}); setCurrentPage(1);}} />
+                                                </TableRow>
+                                            ))
                                         )}
                                     </TableBody>
                                 </Table>
@@ -579,6 +731,7 @@ export default function DocumentRecordsPage() {
 
                 <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                     <DialogContent className="max-w-6xl h-[90vh] p-0 overflow-hidden flex flex-col md:flex-row border-none shadow-2xl">
+                        <DialogDescription className="sr-only">Biểu mẫu chi tiết hồ sơ văn bản</DialogDescription>
                         {/* LEFT SIDEBAR - Explorer Metadata Style */}
                         <div className="w-full md:w-[320px] bg-slate-50 border-r flex flex-col shrink-0">
                             <div className="p-6 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
@@ -743,7 +896,7 @@ export default function DocumentRecordsPage() {
                                                         {formData.originalFile && <Badge variant="secondary" className="mt-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-200 font-bold uppercase text-[10px]">Tệp tin đã sẵn sàng</Badge>}
                                                     </div>
                                                     <div className="flex flex-col gap-2">
-                                                        <Button type="button" variant={formData.originalFile ? "outline" : "default"} onClick={() => fileInputRef.current?.click()} disabled={dialogMode==='view' || isUploading} className="h-11 px-8 shadow-sm">
+                                                        <Button type="button" variant={formData.originalFile ? "outline" : "default"} onClick={() => fileInputRef.current?.click()} disabled={dialogMode==='view' || isUploading || !formData.docType} className="h-11 px-8 shadow-sm">
                                                             {isUploading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
                                                             {formData.originalFile ? "Thay đổi tệp tin" : "Chọn tệp từ máy"}
                                                         </Button>
@@ -753,14 +906,14 @@ export default function DocumentRecordsPage() {
 
                                                 <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-slate-200">
                                                     <Label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-2">
-                                                        <LinkIcon className="h-3.5 w-3.5 text-blue-500" /> Hoặc nhập liên kết (URL) trực tiếp
+                                                        <LinkIcon className="h-3.5 w-3.5 text-blue-500" /> Hoặc nhập liên kết (URL) trực tiếp {!formData.docType && <span className="text-red-400 normal-case">(Vui lòng chọn Loại văn bản trước)</span>}
                                                     </Label>
                                                     <div className="flex gap-2">
                                                         <Input 
                                                             value={formData.originalFile || ''} 
                                                             onChange={e=>setFormData({...formData, originalFile: e.target.value})} 
-                                                            disabled={dialogMode==='view'} 
-                                                            placeholder="https://example.com/document.pdf" 
+                                                            disabled={dialogMode==='view' || !formData.docType} 
+                                                            placeholder={!formData.docType ? "Vui lòng chọn Loại văn bản trước khi nhập liên kết..." : "https://example.com/document.pdf"} 
                                                             className="h-11 border-slate-300 bg-white" 
                                                         />
                                                         {formData.originalFile && (
@@ -913,10 +1066,16 @@ export default function DocumentRecordsPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="h-11 px-6 text-slate-500 font-bold">{t('Hủy bỏ')}</Button>
                                     <Button variant="outline" onClick={() => setFormData(initialFormState)} disabled={!isChanged || dialogMode === 'view'} className="h-11 px-6 border-2 border-slate-200 font-bold hover:bg-slate-50"><Undo2 className="mr-2 h-4 w-4" /> {t('Hoàn tác')}</Button>
                                     {dialogMode !== 'view' ? (
-                                        <Button onClick={handleSave} disabled={!isChanged || !formData.title} className="h-11 px-10 shadow-lg bg-[#1877F2] hover:bg-[#1877F2]/90 font-bold text-base"><Save className="mr-2 h-5 w-5" /> {t('Lưu hồ sơ')}</Button>
+                                        <Button 
+                                            onClick={handleSave} 
+                                            disabled={!isChanged || !formData.title || isExtracting || isUploading} 
+                                            className="h-11 px-10 shadow-lg bg-[#1877F2] hover:bg-[#1877F2]/90 font-bold text-base"
+                                        >
+                                            {(isExtracting || isUploading) ? <Cog className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                                            {isUploading ? t('Đang tải file...') : isExtracting ? t('AI đang xử lý...') : t('Lưu hồ sơ')}
+                                        </Button>
                                     ) : (
                                         <Button onClick={() => setIsEditDialogOpen(false)} className="h-11 px-10 font-bold">{t('Đóng')}</Button>
                                     )}
@@ -954,6 +1113,7 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t, docT
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+                <DialogDescription className="sr-only">Bộ lọc nâng cao cho hồ sơ văn bản</DialogDescription>
                 <div className="flex items-center justify-between border-b pl-4 pr-12 py-3 bg-muted/30">
                     <div className="flex items-center gap-3">
                         <ListFilter className="h-5 w-5 text-primary" />
@@ -1099,3 +1259,4 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t, docT
         </Dialog>
     );
 };
+
