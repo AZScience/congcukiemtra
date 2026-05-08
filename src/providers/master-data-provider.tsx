@@ -80,9 +80,10 @@ export function MasterDataProvider({ children }: { children: React.ReactNode }) 
     const { data: positions, loading: posLoading } = useCollection<Position>(positionsRef);
     const { data: students, loading: stuLoading } = useCollection<Student>(studentsRef);
 
-    // Main loading state should ONLY wait for core data needed for permissions and layout
-    const coreLoading = empLoading || deptLoading || blockLoading || roleLoading || posLoading || recLoading || incLoading;
-    const heavyLoading = (personnelRequested && (stuLoading || lecLoading)) || roomLoading;
+    // Main loading state should ONLY wait for core data needed for layout/navigation
+    // Heavy collections like 'employees' and 'classrooms' should not block the initial app shell
+    const coreLoading = deptLoading || blockLoading || roleLoading || posLoading;
+    const heavyLoading = (personnelRequested && (stuLoading || lecLoading)) || roomLoading || empLoading;
     const loading = coreLoading; 
 
     const employeesMap = useMemo(() => {

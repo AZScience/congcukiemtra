@@ -65,6 +65,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { Separator } from "@/components/ui/separator";
 import { useCollection, useFirestore } from "@/firebase";
+import { useMasterData } from "@/providers/master-data-provider";
 import { collection, query, where } from "firebase/firestore";
 import { format } from 'date-fns';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
@@ -196,10 +197,7 @@ export default function ScheduleViewer() {
     }, [firestore, advancedFilters.date]);
 
     const { data: rawSchedules, loading } = useCollection<DailySchedule>(schedulesRef);
-    const { data: allBlocks } = useCollection<BuildingBlock>(useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]));
-    const { data: allDepts } = useCollection<Department>(useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]));
-    const { data: allRooms } = useCollection<Classroom>(useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]));
-    const { data: allLecturers } = useCollection<Lecturer>(useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]));
+    const { blocks: allBlocks, departments: allDepts, rooms: allRooms, lecturers: allLecturers } = useMasterData();
 
     const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
     const schedules = useMemo(() => rawSchedules ? rawSchedules.map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[] : [], [rawSchedules]);

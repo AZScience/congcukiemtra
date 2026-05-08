@@ -15,16 +15,15 @@ export function initializeFirebase(config: FirebaseOptions = firebaseConfig) {
   
   let firestore;
   try {
-    // Attempt to initialize with specific settings to bypass network issues
+    // Ưu tiên WebSockets cho tính realtime tối ưu, chỉ dùng Long Polling nếu bị chặn
+    // Bật lại bộ nhớ đệm (Local Cache) để tải dữ liệu cực nhanh từ đĩa
     firestore = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      // Disabling cache temporarily to fix potential corruption issues causing hangs
-      // localCache: persistentLocalCache({
-      //   tabManager: persistentMultipleTabManager()
-      // })
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
     });
   } catch (e: any) {
-    console.warn("Firestore initialization warning:", e.message);
+    console.warn("Firestore initialization warning (falling back to default):", e.message);
     firestore = getFirestore(app);
   }
   
