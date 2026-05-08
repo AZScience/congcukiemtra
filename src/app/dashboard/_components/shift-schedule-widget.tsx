@@ -11,6 +11,10 @@ import { ref, uploadBytesResumable, uploadBytes, getDownloadURL } from 'firebase
 import { toast } from '@/hooks/use-toast';
 import { formatTimeAgo } from '@/lib/utils';
 import { useMasterData } from '@/providers/master-data-provider';
+import { useSystemParameters } from '@/providers/system-parameters-provider';
+import { uploadToGoogleDrive } from '@/ai/flows/google-drive-upload';
+import { uploadToFirebaseServer } from '@/ai/flows/firebase-upload';
+import { firebaseConfig } from '@/firebase/config';
 
 export default function ShiftScheduleWidget() {
     const { t } = useLanguage();
@@ -18,6 +22,7 @@ export default function ShiftScheduleWidget() {
     const storage = useStorage();
     const { user } = useUser();
     const { employees } = useMasterData();
+    const { params } = useSystemParameters();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
@@ -25,6 +30,32 @@ export default function ShiftScheduleWidget() {
     const [loading, setLoading] = useState(true);
 
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // Lưới an toàn: Tự động reset trạng thái tải lên nếu bị treo quá 2 phút
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (isUploading) {
+            timer = setTimeout(() => {
+                setIsUploading(false);
+                setUploadProgress(0);
+                toast({ 
+                    variant: 'destructive', 
+                    title: t('Quá thời gian'), 
+                    description: t('Quá trình tải lên mất quá nhiều thời gian và đã được dừng lại.') 
+                });
+            }, 120000); // 2 phút
+        }
+        return () => clearTimeout(timer);
+    }, [isUploading, t]);
+
+    const getEmbedUrl = (url: string) => {
+        if (!url) return '';
+        if (url.includes('drive.google.com')) {
+            // Chuyển đổi link Google Drive sang định dạng preview để có thể nhúng vào iframe
+            return url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
+        }
+        return url;
+    };
 
     useEffect(() => {
         if (!firestore) return;
@@ -65,70 +96,111 @@ export default function ShiftScheduleWidget() {
         
         try {
             if (!storage || !firestore || !user) {
-                toast({ variant: 'destructive', title: t('Lỗi'), description: t('Hệ thống chưa sẵn sàng. Vui lòng thử lại sau.') });
-                setIsUploading(false);
-                return;
+                throw new Error(t('Hệ thống chưa sẵn sàng. Vui lòng thử lại sau.'));
             }
 
+            console.log("ShiftSchedule: Starting upload for", file.name);
             const storagePath = `system/shift_schedule_${Date.now()}.pdf`;
             const storageRef = ref(storage, storagePath);
-            const uploadTask = uploadBytesResumable(storageRef, file);
+            
+            let downloadUrl = '';
+            
+            const withTimeout = (promise: Promise<any>, timeoutMs: number, errorMessage: string) => {
+                return Promise.race([
+                    promise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
+                ]);
+            };
 
-            // Timeout mechanism to detect network blocks (60 seconds)
-            const timeoutId = setTimeout(() => {
-                uploadTask.cancel();
-                toast({ 
-                    variant: 'destructive', 
-                    title: t('Lỗi kết nối'), 
-                    description: t('Quá thời gian kết nối (60s). Mạng của bạn có thể đang chặn dịch vụ Firebase Storage.') 
-                });
-                setIsUploading(false);
-            }, 60000);
-
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(progress);
-                }, 
-                (error) => {
-                    clearTimeout(timeoutId);
-                    if (error.code !== 'storage/canceled') {
-                        console.error('Upload error:', error);
-                        toast({ 
-                            variant: 'destructive', 
-                            title: t('Lỗi tải lên'), 
-                            description: `${error.message} (${error.code})` 
-                        });
-                    }
-                    setIsUploading(false);
-                }, 
-                async () => {
-                    clearTimeout(timeoutId);
+            // --- 1. TRY CLIENT-SIDE FIREBASE UPLOAD ---
+            try {
+                toast({ title: t("Đang thử tải lên..."), description: t("Cố gắng tải trực tiếp lên Firebase Storage.") });
+                const clientUploadPromise = (async () => {
+                    const uploadResult = await uploadBytes(storageRef, file);
+                    console.log("ShiftSchedule: Client-side Firebase Upload successful");
+                    return await getDownloadURL(uploadResult.ref);
+                })();
+                
+                downloadUrl = await withTimeout(clientUploadPromise, 20000, "Firebase client-side timeout");
+            } catch (firebaseErr: any) {
+                console.warn("ShiftSchedule: Client-side upload failed or timed out, trying Server-side Firebase...", firebaseErr.message);
+                toast({ title: t("Đang chuyển hướng..."), description: t("Mạng nội bộ có thể bị chặn, đang thử tải qua Server.") });
+                
+                // --- 2. TRY SERVER-SIDE FIREBASE UPLOAD (Bypasses local network blocks) ---
+                const serviceAccountEmail = (params.evidenceServiceAccountEmail || params.googleServiceAccountEmail || "").trim();
+                const privateKey = (params.evidencePrivateKey || params.googlePrivateKey || "");
+                
+                if (serviceAccountEmail && privateKey) {
                     try {
-                        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        const serverFormData = new FormData();
+                        serverFormData.append('file', file);
+                        serverFormData.append('clientEmail', serviceAccountEmail);
+                        serverFormData.append('privateKey', privateKey);
+                        serverFormData.append('projectId', firebaseConfig.projectId || '');
+                        serverFormData.append('storageBucket', firebaseConfig.storageBucket || '');
 
-                        await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
-                            url: downloadUrl,
-                            name: file.name,
-                            updatedAt: new Date().toISOString(),
-                            updatedBy: user.uid
-                        });
-
-                        toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
-                    } catch (err: any) {
-                        console.error('Firestore update error:', err);
-                        toast({ variant: 'destructive', title: t('Lỗi lưu dữ liệu'), description: err.message });
-                    } finally {
-                        setIsUploading(false);
-                        setUploadProgress(0);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        const serverResult = await withTimeout(uploadToFirebaseServer(serverFormData), 30000, "Firebase server-side timeout");
+                        if (serverResult.success && serverResult.url) {
+                            downloadUrl = serverResult.url;
+                            console.log("ShiftSchedule: Server-side Firebase upload successful.");
+                        }
+                    } catch (serverErr: any) {
+                        console.warn("ShiftSchedule: Server-side upload failed or timed out:", serverErr.message);
                     }
                 }
-            );
+
+                // --- 3. TRY GOOGLE DRIVE FALLBACK (If Firebase still fails) ---
+                if (!downloadUrl) {
+                    toast({ title: t("Đang dùng dự phòng..."), description: t("Đang tải lên Google Drive.") });
+                    console.log("ShiftSchedule: Firebase failed, trying Google Drive fallback...");
+                    const folderId = (params.evidenceGoogleDriveFolderId || params.googleDriveFolderId || "").trim();
+
+                    if (!serviceAccountEmail || !privateKey || !folderId) {
+                        throw new Error(t("Lỗi kết nối và chưa cấu hình Google Drive dự phòng (vui lòng kiểm tra tab Minh chứng)."));
+                    }
+
+                    const gdriveFormData = new FormData();
+                    gdriveFormData.append('file', file);
+                    gdriveFormData.append('folderId', folderId);
+                    gdriveFormData.append('serviceAccountEmail', serviceAccountEmail);
+                    gdriveFormData.append('privateKey', privateKey);
+
+                    try {
+                        const result = await withTimeout(uploadToGoogleDrive(gdriveFormData), 40000, "Google Drive timeout");
+                        if (result.success && result.url) {
+                            downloadUrl = result.url;
+                            console.log("ShiftSchedule: Google Drive fallback successful.");
+                        } else {
+                            throw new Error(result.error || t("Google Drive upload failed."));
+                        }
+                    } catch (driveErr: any) {
+                        throw new Error(driveErr.message || t("Tất cả các phương thức tải lên đều thất bại hoặc quá thời gian."));
+                    }
+                }
+            }
+
+            if (!downloadUrl) throw new Error(t("Không thể lấy liên kết tệp tin."));
+
+            console.log("ShiftSchedule: Updating Firestore metadata...");
+            await setDoc(doc(firestore, 'system_settings', 'shift_schedule'), {
+                url: downloadUrl,
+                name: file.name,
+                updatedAt: new Date().toISOString(),
+                updatedBy: user.uid
+            });
+
+            toast({ title: t('Thành công'), description: t('Đã cập nhật lịch trực mới.') });
         } catch (error: any) {
-            console.error('Initialization error:', error);
-            toast({ variant: 'destructive', title: t('Lỗi'), description: error.message });
+            console.error('ShiftSchedule upload error:', error);
+            toast({ 
+                variant: 'destructive', 
+                title: t('Lỗi tải lên'), 
+                description: error.message || t('Đã xảy ra lỗi không xác định.')
+            });
+        } finally {
             setIsUploading(false);
+            setUploadProgress(0);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -168,7 +240,7 @@ export default function ShiftScheduleWidget() {
                         disabled={isUploading}
                     >
                         {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                        {isUploading ? `${Math.round(uploadProgress)}%` : (scheduleData ? t('Cập nhật lịch mới') : t('Tải lên lịch trực'))}
+                        {isUploading ? t('Đang tải...') : (scheduleData?.url ? t('Cập nhật lịch mới') : t('Tải lên lịch trực'))}
                     </Button>
                     {scheduleData && scheduleData.url && (
                         <Button size="sm" variant="default" asChild className="h-8">
@@ -187,12 +259,22 @@ export default function ShiftScheduleWidget() {
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         </div>
                     ) : scheduleData && scheduleData.url ? (
-                        <div className="w-full h-[600px] md:h-[800px] bg-muted/10">
+                        <div className="w-full h-[600px] md:h-[800px] bg-muted/10 relative">
                             <iframe 
-                                src={`${scheduleData.url}#view=FitH`}
+                                src={`${getEmbedUrl(scheduleData.url)}${scheduleData.url.includes('drive.google.com') ? '' : '#view=FitH'}`}
                                 className="w-full h-full border-0 rounded-b-lg"
                                 title="Lịch trực"
                             />
+                            {scheduleData.url.includes('drive.google.com') && (
+                                <div className="absolute top-2 right-2 flex gap-2">
+                                    <Button size="sm" variant="secondary" className="opacity-80 hover:opacity-100" asChild>
+                                        <a href={scheduleData.url} target="_blank" rel="noopener noreferrer">
+                                            <Eye className="h-4 w-4 mr-1" />
+                                            Xem trực tiếp
+                                        </a>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-[300px] bg-muted/5">
