@@ -125,7 +125,7 @@ export default function DocumentLookupPage() {
     };
 
     const getFileInfo = (url: string) => {
-        if (!url) return { icon: FileDown, name: 'None', isLink: false };
+        if (!url) return { icon: FileDown, name: 'None', isLink: false, color: 'text-slate-400', bgColor: 'bg-slate-100' };
         const isFirebase = url.includes('firebasestorage');
         const isDirectLink = !isFirebase && (url.startsWith('http') || url.startsWith('www'));
         
@@ -135,23 +135,45 @@ export default function DocumentLookupPage() {
                 const decoded = decodeURIComponent(url);
                 const parts = decoded.split('/');
                 const lastPart = parts[parts.length - 1].split('?')[0];
-                name = lastPart.split('_').slice(1).join('_') || lastPart; // Remove timestamp prefix if exists
+                name = lastPart.split('_').slice(1).join('_') || lastPart;
             } else {
                 const parts = url.split('/');
                 name = parts[parts.length - 1] || url;
             }
         } catch (e) { name = url; }
 
-        const ext = name.split('.').pop()?.toLowerCase();
+        const ext = name.split('.').pop()?.toLowerCase() || '';
         let icon = FileText;
-        if (ext === 'pdf') icon = FileText;
-        else if (['doc', 'docx'].includes(ext!)) icon = FileText;
-        else if (['xls', 'xlsx', 'csv'].includes(ext!)) icon = FileSpreadsheet;
-        else if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext!)) icon = FileImage;
-        else if (['zip', 'rar', '7z'].includes(ext!)) icon = FileArchive;
-        else if (isDirectLink) icon = LinkIcon;
+        let color = 'text-slate-500';
+        let bgColor = 'bg-slate-100';
 
-        return { icon, name, isLink: isDirectLink };
+        if (ext === 'pdf') {
+            icon = FileText;
+            color = 'text-rose-600';
+            bgColor = 'bg-rose-50';
+        } else if (['doc', 'docx'].includes(ext)) {
+            icon = FileText;
+            color = 'text-blue-600';
+            bgColor = 'bg-blue-50';
+        } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+            icon = FileSpreadsheet;
+            color = 'text-emerald-600';
+            bgColor = 'bg-emerald-50';
+        } else if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) {
+            icon = FileImage;
+            color = 'text-amber-600';
+            bgColor = 'bg-amber-50';
+        } else if (['zip', 'rar', '7z'].includes(ext)) {
+            icon = FileArchive;
+            color = 'text-purple-600';
+            bgColor = 'bg-purple-50';
+        } else if (isDirectLink) {
+            icon = LinkIcon;
+            color = 'text-primary';
+            bgColor = 'bg-blue-50';
+        }
+
+        return { icon, name, isLink: isDirectLink, color, bgColor, ext: ext.toUpperCase() };
     };
 
     // Cloud Presets Logic
@@ -482,8 +504,13 @@ export default function DocumentLookupPage() {
                                                             onClick={() => setSelectedDoc(item)}
                                                         >
                                                             <div className="flex items-start gap-3">
-                                                                <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm", isActive ? "bg-primary text-white" : "bg-slate-100 text-slate-500")}>
+                                                                <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm transition-colors relative", isActive ? "bg-primary text-white" : cn(fileInfo.bgColor, fileInfo.color))}>
                                                                     <Icon className="h-5 w-5" />
+                                                                    {!fileInfo.isLink && fileInfo.ext && (
+                                                                        <span className={cn("absolute -bottom-1 -right-1 text-[8px] font-bold px-1 rounded-sm border shadow-sm", isActive ? "bg-white text-primary border-primary" : cn("bg-white", fileInfo.color, "border-current"))}>
+                                                                            {fileInfo.ext}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <h4 className={cn("text-sm font-bold truncate", isActive ? "text-primary" : "text-slate-800")}>{fileInfo.name}</h4>
@@ -529,9 +556,20 @@ export default function DocumentLookupPage() {
                                             {/* PREVIEW HEADER */}
                                             <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50/30 shrink-0">
                                                 <div className="flex items-center gap-4 min-w-0">
-                                                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center text-primary shadow-inner shrink-0">
-                                                        {(() => { const info = getFileInfo(selectedDoc.originalFile || ''); const I = info.icon; return <I className="h-5 w-5" />; })()}
-                                                    </div>
+                                                    {(() => {
+                                                        const info = getFileInfo(selectedDoc.originalFile || '');
+                                                        const I = info.icon;
+                                                        return (
+                                                            <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shadow-inner shrink-0 relative", info.bgColor, info.color)}>
+                                                                <I className="h-5 w-5" />
+                                                                {!info.isLink && info.ext && (
+                                                                    <span className={cn("absolute -bottom-1 -right-1 text-[8px] font-bold px-1 rounded-sm border shadow-sm bg-white border-current")}>
+                                                                        {info.ext}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                     <div className="min-w-0">
                                                         <h3 className="text-base font-bold text-slate-800 truncate leading-tight" title={selectedDoc.title}>{selectedDoc.title}</h3>
                                                         <div className="flex items-center gap-4 mt-1">
@@ -643,9 +681,20 @@ export default function DocumentLookupPage() {
                             <div className="flex-1 flex flex-col bg-white">
                                 <div className="px-6 py-3 border-b flex items-center justify-between bg-slate-50 shrink-0">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                                            {(() => { const info = getFileInfo(fullPreviewDoc.originalFile || ''); const I = info.icon; return <I className="h-4 w-4" />; })()}
-                                        </div>
+                                        {(() => {
+                                            const info = getFileInfo(fullPreviewDoc.originalFile || '');
+                                            const I = info.icon;
+                                            return (
+                                                <div className={cn("h-8 w-8 rounded flex items-center justify-center shrink-0 relative", info.bgColor, info.color)}>
+                                                    <I className="h-4 w-4" />
+                                                    {!info.isLink && info.ext && (
+                                                        <span className="absolute -bottom-1 -right-1 text-[7px] font-bold px-0.5 rounded-sm bg-white border border-current shadow-xs">
+                                                            {info.ext}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                         <h3 className="text-sm font-bold text-slate-800 truncate">{fullPreviewDoc.title}</h3>
                                     </div>
                                     <div className="flex items-center gap-2">

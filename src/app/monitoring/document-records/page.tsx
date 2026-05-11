@@ -42,7 +42,8 @@ import { useLanguage } from "@/hooks/use-language";
 import { firebaseConfig } from "@/firebase/config";
 import { useCollection, useFirestore, useUser, useFirebaseApp, useStorage } from "@/firebase";
 import { collection, doc, setDoc, deleteDoc, getDoc, query, where, orderBy, limit } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
@@ -383,6 +384,7 @@ export default function DocumentRecordsPage() {
     };
 
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [isExtracting, setIsExtracting] = useState(false);
 
     const triggerAIExtraction = useCallback(async (fileName: string) => {
@@ -444,17 +446,31 @@ export default function DocumentRecordsPage() {
             // --- 1. TRY CLIENT-SIDE UPLOAD (with timeout) ---
             try {
                 console.log("Attempting client-side Firebase upload...");
-                const clientUploadPromise = (async () => {
+                const clientUploadPromise = new Promise<string>((resolve, reject) => {
                     const storageRef = ref(storage, `evidence/${Date.now()}_${file.name}`);
-                    const uploadResult = await uploadBytes(storageRef, file);
-                    return await getDownloadURL(uploadResult.ref);
-                })();
+                    const uploadTask = uploadBytesResumable(storageRef, file);
 
-                const timeoutPromise = new Promise((_, reject) => 
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            setUploadProgress(progress);
+                        }, 
+                        (error) => {
+                            console.warn("Client-side upload error:", error);
+                            reject(error);
+                        }, 
+                        async () => {
+                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                            resolve(downloadURL);
+                        }
+                    );
+                });
+
+                const timeoutPromise = new Promise<string>((_, reject) => 
                     setTimeout(() => reject(new Error("Client-side upload timeout")), uploadTimeout)
                 );
 
-                url = await Promise.race([clientUploadPromise, timeoutPromise]) as string;
+                url = await Promise.race([clientUploadPromise, timeoutPromise]);
                 console.log("Client-side upload successful:", url);
             } catch (clientError: any) {
                 console.warn("Client-side upload failed or timed out:", clientError.message);
@@ -516,6 +532,7 @@ export default function DocumentRecordsPage() {
             });
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -918,6 +935,16 @@ export default function DocumentRecordsPage() {
                                                         {formData.originalFile && <Button variant="ghost" className="text-blue-600 h-8" onClick={() => window.open(formData.originalFile, '_blank')}><Eye className="h-4 w-4 mr-2" /> Xem file/liên kết</Button>}
                                                     </div>
                                                 </div>
+
+                                                {isUploading && (
+                                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                                                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            <span>Đang tải lên hệ thống...</span>
+                                                            <span>{Math.round(uploadProgress)}%</span>
+                                                        </div>
+                                                        <Progress value={uploadProgress} className="h-1.5 bg-slate-100" />
+                                                    </div>
+                                                )}
 
                                                 <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-slate-200">
                                                     <Label className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-2">
