@@ -206,7 +206,9 @@ export default function DocumentRecordsPage() {
     const [currentPage, setCurrentPage] = useLocalStorage('doc_records_page_v1', 1);
     const [rowsPerPage, setRowsPerPage] = useLocalStorage('doc_records_rows_v1', 10);
     const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('doc_records_colVis_v1', { 
-        docCode: true, docNumber: true, title: true, docType: true, issueDate: true, status: true, urgency: true 
+        docCode: true, docNumber: true, title: true, docType: true, issueDate: true, receivedDate: false, 
+        issuingBody: false, signer: false, abstract: false, status: true, urgency: true, 
+        confidentiality: false, department: false, assignee: false 
     });
     const [filters, setFilters] = useLocalStorage<any>('doc_records_filters_v1', {});
     
@@ -416,6 +418,10 @@ export default function DocumentRecordsPage() {
             toast({ title: t("Lỗi định dạng"), description: t("Hỗ trợ: PDF, DOCX, XLSX, TXT, PNG, JPG, ZIP, RAR"), variant: "destructive" });
             return;
         }
+        if (file.size > 20 * 1024 * 1024) {
+            toast({ title: t("Lỗi dung lượng"), description: t("Tệp quá lớn. Vui lòng chọn tệp dưới 20MB."), variant: "destructive" });
+            return;
+        }
         const serviceAccountEmail = (systemParams.evidenceServiceAccountEmail || systemParams.googleServiceAccountEmail || "").trim();
         const privateKey = (systemParams.evidencePrivateKey || systemParams.googlePrivateKey || "");
         const driveFolderId = (systemParams.evidenceGoogleDriveFolderId || systemParams.googleDriveFolderId || "").trim();
@@ -432,7 +438,7 @@ export default function DocumentRecordsPage() {
         console.log("Starting upload process for:", file.name);
         
         try {
-            const uploadTimeout = 20000; // 20 seconds
+            const uploadTimeout = 8000; // 8 seconds for client-side attempt
             let url = '';
 
             // --- 1. TRY CLIENT-SIDE UPLOAD (with timeout) ---
@@ -560,14 +566,14 @@ export default function DocumentRecordsPage() {
     };
 
     const columnDefs: any = { 
-        docCode: 'Mã văn bản', docNumber: 'Số/ký hiệu', title: 'Tiêu đề', docType: 'Loại văn bản', 
-        issueDate: 'Ngày ban hành', receivedDate: 'Ngày nhận', issuingBody: 'Cơ quan ban hành',
+        docCode: 'Mã văn bản', docNumber: 'Số/ký hiệu', title: 'Tiêu đề', abstract: 'Trích yếu', docType: 'Loại văn bản', 
+        issueDate: 'Ngày ban hành', receivedDate: 'Ngày nhận', issuingBody: 'Cơ quan ban hành', signer: 'Người ký',
         status: 'Trạng thái', urgency: 'Độ khẩn', confidentiality: 'Độ mật', department: 'Phòng ban xử lý', assignee: 'Người phụ trách'
     };
 
     const colIcons: Record<string, any> = {
-        docCode: Hash, docNumber: FileText, title: StickyNote, docType: Tags, 
-        issueDate: Calendar, receivedDate: Clock, issuingBody: Building, 
+        docCode: Hash, docNumber: FileText, title: StickyNote, abstract: Info, docType: Tags, 
+        issueDate: Calendar, receivedDate: Clock, issuingBody: Building, signer: User,
         status: AlertCircle, urgency: AlertTriangle, confidentiality: Shield,
         department: Building, assignee: User
     };
@@ -670,19 +676,28 @@ export default function DocumentRecordsPage() {
                                             />
                                         ) : (
                                             currentItems.map((item, idx) => (
-                                                <TableRow key={item.renderId} className={cn("cursor-pointer transition-colors hover:bg-slate-50", selectedSet.has(item.renderId) && "bg-blue-50/50")} onClick={() => handleRowClick(item.renderId)}>
-                                                    <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
+                                                <TableRow 
+                                                    key={item.renderId} 
+                                                    data-state={selectedSet.has(item.renderId) ? "selected" : ""}
+                                                    className={cn(
+                                                        "cursor-pointer transition-all hover:bg-yellow-300 hover:text-black group", 
+                                                        "data-[state=selected]:bg-red-800 data-[state=selected]:text-white"
+                                                    )} 
+                                                    onClick={() => handleRowClick(item.renderId)}
+                                                >
+                                                    <TableCell className="text-center font-medium text-inherit border-r">{startIndex + idx + 1}</TableCell>
                                                     {Object.keys(columnDefs).filter(k => columnVisibility[k]).map(columnKey => (
                                                         <TableCell key={columnKey} className="border-r">
                                                             {columnKey === 'status' ? <StatusBadge status={item.status} t={t} /> : 
                                                              columnKey === 'urgency' ? <UrgencyBadge urgency={item.urgency} t={t} /> :
                                                              columnKey === 'confidentiality' ? <ConfidentialityBadge confidentiality={item.confidentiality} t={t} /> :
-                                                             columnKey === 'title' ? <span className="font-bold text-slate-800 line-clamp-2">{item.title}</span> :
-                                                             columnKey === 'docCode' ? <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-700 font-mono text-[11px]">{item.docCode}</code> :
-                                                             <span className="text-slate-600">{(item as any)[columnKey] || '---'}</span>}
+                                                             columnKey === 'title' ? <span className="font-bold text-inherit line-clamp-2">{item.title}</span> :
+                                                             columnKey === 'abstract' ? <span className="text-inherit line-clamp-2 italic opacity-80">{item.abstract}</span> :
+                                                             columnKey === 'docCode' ? <code className="bg-slate-100/50 px-1.5 py-0.5 rounded text-blue-700 group-data-[state=selected]:text-blue-200 font-mono text-[11px]">{item.docCode}</code> :
+                                                             <span className="text-inherit">{(item as any)[columnKey] || '---'}</span>}
                                                         </TableCell>
                                                     ))}
-                                                    <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm border-l p-0 text-center">
+                                                    <TableCell className="sticky right-0 z-10 bg-white group-data-[state=selected]:bg-red-800 group-hover:bg-yellow-300 shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l p-0 text-center transition-colors">
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">

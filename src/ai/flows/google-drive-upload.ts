@@ -68,6 +68,9 @@ export async function uploadToGoogleDrive(formData: FormData) {
                 Buffer.from(close_delim)
             ]);
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds for Drive upload
+
             const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink&supportsAllDrives=true', {
                 method: 'POST',
                 headers: {
@@ -76,7 +79,9 @@ export async function uploadToGoogleDrive(formData: FormData) {
                     'Content-Length': multipartRequestBody.length.toString(),
                 },
                 body: multipartRequestBody as unknown as BodyInit,
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             return response;
         };

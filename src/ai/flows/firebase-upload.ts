@@ -26,10 +26,10 @@ export async function uploadToFirebaseServer(formData: FormData) {
         const { token } = await auth.getAccessToken();
         if (!token) throw new Error("Không thể lấy Access Token từ Service Account.");
 
-        // Ưu tiên các bucket đã xác định là hoạt động tốt
+        // Ưu tiên bucket được truyền từ client (cấu hình trong system params)
         const bucketNames = [
-            'kiemtranoibo-ccks.firebasestorage.app',
             storageBucket,
+            'kiemtranoibo-ccks.firebasestorage.app',
             'kiemtranoibo-ccks.appspot.com',
             'kiemtranoibo-493603.appspot.com',
         ].filter((v, i, a) => v && a.indexOf(v) === i);
@@ -60,6 +60,9 @@ export async function uploadToFirebaseServer(formData: FormData) {
                     Buffer.from(`\r\n--${boundary}--`)
                 ]);
 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout per bucket
+
                 const response = await fetch(uploadUrl, {
                     method: 'POST',
                     headers: {
@@ -67,7 +70,9 @@ export async function uploadToFirebaseServer(formData: FormData) {
                         'Content-Type': `multipart/related; boundary=${boundary}`,
                     },
                     body: multipartBody,
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     const errorText = await response.text();
