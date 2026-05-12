@@ -114,6 +114,7 @@ export type DocumentRecord = {
   extractedText?: string;
   aiSummary?: string;
   keywords?: string[];
+  filePassword?: string;
   createdAt?: string;
   updatedAt?: string;
 };
