@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
+      bodySizeLimit: '20mb',
       allowedOrigins: [
         '6000-firebase-studio-1766398994980.cluster-fdkw7vjj7bgguspe3fbbc25tra.cloudworkstations.dev',
         '9000-firebase-studio-1766398994980.cluster-fdkw7vjj7bgguspe3fbbc25tra.cloudworkstations.dev',

@@ -17,7 +17,7 @@ import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ClientOnly } from '@/components/client-only';
-import { EvidenceInput } from "@/components/monitoring/evidence-input";
+import { EvidenceInput } from "@/components/monitoring/evidence-input-v2";
 import { Separator } from "@/components/ui/separator";
 
 

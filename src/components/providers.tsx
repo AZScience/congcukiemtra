@@ -91,23 +91,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const [isStandalonePage, setIsStandalonePage] = useState<boolean>(
+    const isStandalonePage = 
         pathname?.startsWith('/login') || 
         pathname?.startsWith('/lecturer-portal') || 
         pathname?.startsWith('/poll') || 
         pathname?.startsWith('/exam') || 
-        false
-    );
-
-    useEffect(() => {
-        setIsStandalonePage(
-            pathname?.startsWith('/login') || 
-            pathname?.startsWith('/lecturer-portal') || 
-            pathname?.startsWith('/poll') || 
-            pathname?.startsWith('/exam') || 
-            false
-        );
-    }, [pathname]);
+        false;
 
     if (isStandalonePage) {
         const isLecturerPortal = pathname?.startsWith('/lecturer-portal');
@@ -137,11 +126,9 @@ function RootLayoutContent({ children }: { children: React.ReactNode }) {
 
     return (
         <AuthGuard>
-            <MasterDataProvider>
-                <VisitTrackerProvider>
-                    <AppShell>{children}</AppShell>
-                </VisitTrackerProvider>
-            </MasterDataProvider>
+            <VisitTrackerProvider>
+                <AppShell>{children}</AppShell>
+            </VisitTrackerProvider>
         </AuthGuard>
     );
 }
@@ -150,19 +137,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <FirebaseClientProvider>
             <SystemParametersProvider>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    <LanguageProvider>
+                <LanguageProvider>
+                    <MasterDataProvider>
                         <ClientOnly>
-                            <RootLayoutContent>{children}</RootLayoutContent>
-                            <Toaster />
+                            <ThemeProvider
+                                attribute="class"
+                                defaultTheme="light"
+                            >
+                                <RootLayoutContent>{children}</RootLayoutContent>
+                                <Toaster />
+                            </ThemeProvider>
                         </ClientOnly>
-                    </LanguageProvider>
-                </ThemeProvider>
+                    </MasterDataProvider>
+                </LanguageProvider>
             </SystemParametersProvider>
         </FirebaseClientProvider>
     );

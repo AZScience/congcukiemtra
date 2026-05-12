@@ -16,7 +16,7 @@ import {
   FileStack, AlertCircle, Calendar, Settings2, Key, History,
   IdCard, FileType, Camera, Hash, Edit3, Plus, 
   FileUp, FileDown, CheckSquare, QrCode, MonitorPlay, MessageSquareQuote,
-  Bot, MessagesSquare, Mail, Eye
+  Bot, MessagesSquare, Mail, Eye, LayoutGrid
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -48,6 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS, ADMIN_PERMISSIONS, LECTURER_PERMISSIONS, ADVISOR_PERMISSIONS } from '@/lib/permissions-defaults';
 import type { Role, Permissions } from '@/lib/types';
 
 const MODULE_CATEGORIES = [
@@ -70,7 +71,8 @@ const MODULE_CATEGORIES = [
             { id: '/personnel/students', label: 'Danh mục Sinh viên', icon: Users2 },
             { id: '/personnel/roles', label: 'Danh mục Vai trò', icon: Shield },
             { id: '/personnel/recognitions', label: 'Việc ghi nhận', icon: Trophy },
-            { id: '/personnel/incident-categories', label: 'Việc phát sinh', icon: AlertTriangle }
+            { id: '/personnel/incident-categories', label: 'Việc phát sinh', icon: AlertTriangle },
+            { id: '/personnel/document-types', label: 'Loại văn bản', icon: FileType }
         ]
     },
     {
@@ -84,7 +86,8 @@ const MODULE_CATEGORIES = [
             { id: '/monitoring/student-violations', label: 'Sinh viên vi phạm', icon: UserX },
             { id: '/monitoring/asset-check', label: 'Nhận - Trả tài sản', icon: Package },
             { id: '/monitoring/requests', label: 'Tiếp nhận yêu cầu', icon: FileQuestion },
-            { id: '/monitoring/petitions', label: 'Tiếp nhận đơn thư', icon: FileText }
+            { id: '/monitoring/petitions', label: 'Tiếp nhận đơn thư', icon: FileText },
+            { id: '/monitoring/document-records', label: 'Quản lý hồ sơ', icon: FileStack }
         ]
     },
     {
@@ -114,9 +117,11 @@ const MODULE_CATEGORIES = [
             { id: '/monitoring/online-classes', label: 'Giám sát Online', icon: MonitorPlay },
             { id: '/feedback', label: 'Minh chứng ca trực', icon: MessageSquareQuote },
             { id: '/monitoring/evidence', label: 'Kho minh chứng', icon: Camera },
-            { id: '/ai/assistant', label: 'Tra cứu thông tin (AI)', icon: Bot },
+            { id: '/ai/assistant', label: 'Tra cứu thông tin', icon: Search },
+            { id: '/monitoring/document-lookup', label: 'Tra cứu văn bản', icon: Search },
             { id: '/discussion', label: 'Bảng thảo luận', icon: MessagesSquare },
-            { id: '/messaging', label: 'Hộp thư nội bộ', icon: Mail }
+            { id: '/messaging', label: 'Hộp thư nội bộ', icon: Mail },
+            { id: '/lecturer-portal', label: 'Portal Giảng viên', icon: UserCircle }
         ]
     }
 ];
@@ -568,13 +573,15 @@ export default function PermissionsPage() {
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-bold text-lg border-l-4 border-primary pl-3">Ma trận phân quyền</h3>
-                                        <Button variant="outline" size="sm" onClick={() => {
-                                            const allChecked = ALL_MODULES.every(m => PERMISSION_KEYS.every(k => formData.permissions?.[m.id]?.[k]));
-                                            ALL_MODULES.forEach(m => toggleRowPermissions(m.id, !allChecked));
-                                        }}>
-                                            <Check className="h-4 w-4 mr-2" />
-                                            Chọn / Bỏ chọn tất cả
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => {
+                                                const allChecked = ALL_MODULES.every(m => PERMISSION_KEYS.every(k => formData.permissions?.[m.id]?.[k]));
+                                                ALL_MODULES.forEach(m => toggleRowPermissions(m.id, !allChecked));
+                                            }}>
+                                                <Check className="h-4 w-4 mr-2" />
+                                                Chọn / Bỏ chọn tất cả
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     <div className="border rounded-md overflow-hidden">

@@ -65,7 +65,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { Separator } from "@/components/ui/separator";
 import { useCollection, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useMasterData } from "@/providers/master-data-provider";
+import { collection, query, where } from "firebase/firestore";
 import { format } from 'date-fns';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Badge } from "@/components/ui/badge";
@@ -165,16 +166,6 @@ export default function ScheduleViewer() {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const schedulesRef = useMemo(() => (firestore ? collection(firestore, 'schedules') : null), [firestore]);
-    const { data: rawSchedules, loading } = useCollection<DailySchedule>(schedulesRef);
-    const { data: allBlocks } = useCollection<BuildingBlock>(useMemo(() => (firestore ? collection(firestore, 'building-blocks') : null), [firestore]));
-    const { data: allDepts } = useCollection<Department>(useMemo(() => (firestore ? collection(firestore, 'departments') : null), [firestore]));
-    const { data: allRooms } = useCollection<Classroom>(useMemo(() => (firestore ? collection(firestore, 'classrooms') : null), [firestore]));
-    const { data: allLecturers } = useCollection<Lecturer>(useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]));
-
-    const schedules = useMemo(() => rawSchedules ? rawSchedules.map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[] : [], [rawSchedules]);
-
-    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
     const [advancedFilters, setAdvancedFilters] = useState<any>({
         date: format(new Date(), 'yyyy-MM-dd'), 
         buildings: [], 
@@ -187,12 +178,36 @@ export default function ScheduleViewer() {
         statuses: []
     });
 
+    // Optimize: Fetch by date using a query
+    const schedulesRef = useMemo(() => {
+        if (!firestore) return null;
+        const dateISO = advancedFilters.date;
+        if (!dateISO) return collection(firestore, 'schedules'); // Fallback if no date (might be slow)
+        
+        let dateDMY = dateISO;
+        if (dateISO.includes('-')) {
+            const [y, m, d] = dateISO.split('-');
+            dateDMY = `${d}/${m}/${y}`;
+        }
+        
+        return query(
+            collection(firestore, 'schedules'),
+            where('date', 'in', [dateISO, dateDMY])
+        );
+    }, [firestore, advancedFilters.date]);
+
+    const { data: rawSchedules, loading } = useCollection<DailySchedule>(schedulesRef);
+    const { blocks: allBlocks, departments: allDepts, rooms: allRooms, lecturers: allLecturers } = useMasterData();
+
+    const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+    const schedules = useMemo(() => rawSchedules ? rawSchedules.map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as any[] : [], [rawSchedules]);
+
     const [currentPage, setCurrentPage] = useLocalStorage('dash_schedules_currentPage_v1', 1);
     const [rowsPerPage, setRowsPerPage] = useLocalStorage('dash_schedules_rowsPerPage_v1', 10);
     
     const [columnVisibility, setColumnVisibility] = useLocalStorage<Record<string, boolean>>('dash_schedules_columnVisibility_v1', { 
         date: true, period: true, type: true, department: true, class: true, studentCount: true, 
-        content: true, status: true, isNotification: false, note: false
+        content: true, status: true, note: false
     });
     
     const [filters, setFilters] = useLocalStorage<Partial<Record<keyof DailySchedule, string>>>('dash_schedules_filters_v1', {});
@@ -294,14 +309,13 @@ export default function ScheduleViewer() {
         studentCount: { title: 'Sĩ số' }, 
         content: { title: 'Nội dung' }, 
         status: { title: 'Trạng thái' },
-        isNotification: { title: 'Thông báo' },
         note: { title: 'Ghi chú' }
     };
     const allColumns = Object.keys(columnDefs);
     const orderedColumns = allColumns.filter(key => columnVisibility[key]);
 
     return (
-        <Card className="shadow-md">
+        <Card className="shadow-md overflow-hidden">
             <CardHeader className="py-3 border-b">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -394,8 +408,6 @@ export default function ScheduleViewer() {
                                                          <span>{item.status}</span>
                                                          {item.incident && <Badge variant="destructive" className="text-[10px] h-4 px-1 w-fit">{item.incident}</Badge>}
                                                      </div>
-                                                 ) : key === 'isNotification' ? (
-                                                     item.isNotification ? <Badge className="bg-blue-600">Có</Badge> : <Badge variant="outline">Không</Badge>
                                                  ) : String((item as any)[key] ?? '')}
                                             </TableCell>
                                         ))}
@@ -407,11 +419,11 @@ export default function ScheduleViewer() {
                     </Table>
                 </div>
             </CardContent>
-            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
-                <div className="text-sm text-muted-foreground">Tổng cộng {sortedItems.length} bản ghi. {selectedSet.size > 0 && `Đã chọn ${selectedSet.size} dòng.`}</div>
-                <div className="flex items-center gap-4">
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t w-full overflow-hidden">
+                <div className="text-sm text-muted-foreground text-center sm:text-left">Tổng cộng {sortedItems.length} bản ghi. {selectedSet.size > 0 && `Đã chọn ${selectedSet.size} dòng.`}</div>
+                <div className="flex flex-wrap items-center justify-center gap-4 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
-                        <p className="text-sm text-muted-foreground">Số dòng</p>
+                        <p className="text-sm text-muted-foreground shrink-0">Số dòng</p>
                         <Select value={`${safeRowsPerPage}`} onValueChange={(v) => { setRowsPerPage(Number(v)); setCurrentPage(1); }}>
                             <SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={safeRowsPerPage} /></SelectTrigger>
                             <SelectContent side="top">
@@ -419,12 +431,12 @@ export default function ScheduleViewer() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(1)} disabled={safeCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
-                        <div className="flex items-center gap-1 font-medium text-sm"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value, 10); if (p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronRight className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8 p-0" onClick={() => setCurrentPage(totalPages)} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronsRight className="h-4 w-4" /></Button>
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(1)} disabled={safeCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                        <div className="flex items-center gap-1 font-medium text-sm shrink-0"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value, 10); if (p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronRight className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8 p-0 shrink-0" onClick={() => setCurrentPage(totalPages)} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronsRight className="h-4 w-4" /></Button>
                     </div>
                 </div>
             </CardFooter>

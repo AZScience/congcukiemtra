@@ -33,6 +33,7 @@ import {
   Lock,
   MailQuestion,
   MonitorCheck,
+  Search,
   Shield,
   ShieldAlert,
   SlidersHorizontal,
@@ -61,13 +62,13 @@ import {
   Video,
   Layout,
   Camera,
+  FileText,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import type { Employee, Role } from "@/lib/types";
-import { useUser, useFirestore, useDoc, useCollection } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export const menuItems = [
   {
@@ -92,6 +93,7 @@ export const menuItems = [
       { label: "Vai trò", href: "/personnel/roles", icon: Shield, iconColor: "text-purple-500" },
       { label: "Việc ghi nhận", href: "/personnel/recognitions", icon: FilePenLine, iconColor: "text-teal-500" },
       { label: "Việc phát sinh", href: "/personnel/incident-categories", icon: FolderArchive, iconColor: "text-pink-500" },
+      { label: "Loại văn bản", href: "/personnel/document-types", icon: FileText, iconColor: "text-blue-500" },
     ],
   },
   {
@@ -108,6 +110,7 @@ export const menuItems = [
       { label: "Nhận - Trả tài sản", href: "/monitoring/asset-check", icon: ClipboardPaste, iconColor: "text-pink-500" },
       { label: "Tiếp nhận yêu cầu", href: "/monitoring/requests", icon: MailQuestion, iconColor: "text-teal-500" },
       { label: "Tiếp nhận đơn thư", href: "/monitoring/petitions", icon: UserX, iconColor: "text-red-500" },
+      { label: "Quản lý hồ sơ", href: "/monitoring/document-records", icon: FolderArchive, iconColor: "text-amber-500" },
     ],
   },
   {
@@ -143,71 +146,78 @@ export const menuItems = [
       { label: "Giám sát Online", href: "/monitoring/online-classes", icon: Video, iconColor: "text-purple-500" },
       { label: "Minh chứng ca trực", href: "/feedback", icon: FileCheck, iconColor: "text-amber-500" },
       { label: "Kho minh chứng", href: "/monitoring/evidence", icon: Camera, iconColor: "text-blue-500" },
-      { label: "Tra cứu thông tin", href: "/ai/assistant", icon: FileSearch, iconColor: "text-blue-500" },
-      { label: "Bảng thảo luận", href: "/discussion", icon: Layout, iconColor: "text-pink-500" },
+       { label: "Tra cứu thông tin", href: "/ai/assistant", icon: FileSearch, iconColor: "text-blue-500" },
+       { label: "Tra cứu văn bản", href: "/monitoring/document-lookup", icon: Search, iconColor: "text-sky-500" },
+       { label: "Bảng thảo luận", href: "/discussion", icon: Layout, iconColor: "text-pink-500" },
       { label: "Hộp thư nội bộ", href: "/messaging", icon: Mail, iconColor: "text-teal-500" },
+      { label: "Portal Giảng viên", href: "/lecturer-portal", icon: UserSquare, iconColor: "text-indigo-500" },
     ],
   },
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar();
   const { t } = useLanguage();
-  const { user: authUser } = useUser();
-  const firestore = useFirestore();
-
-  const employeeDocRef = React.useMemo(() => {
-    if (!firestore || !authUser) return null;
-    return doc(firestore, 'employees', authUser.uid);
-  }, [firestore, authUser]);
-  const { data: user } = useDoc<Employee>(employeeDocRef);
-
-  const rolesCollectionRef = React.useMemo(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'roles');
-  }, [firestore]);
-  const { data: allRoles } = useCollection<Role>(rolesCollectionRef);
-
-  const userRole = React.useMemo(() => {
-    if (!user || !allRoles) return null;
-    return allRoles.find(r => r.name === user.role);
-  }, [allRoles, user]);
-  
-  const userPermissions = React.useMemo(() => userRole?.permissions || {}, [userRole]);
+  const { user, userRole, hasPermission, isSuperAdmin, isLoading } = usePermissions();
 
   const filteredMenuItems = React.useMemo(() => {
-    if (!userRole || userRole.name === 'Hệ thống') return menuItems;
-
+    if (isLoading) return [];
+    
     return menuItems.map(item => {
       if (item.subItems) {
-        const filteredSubItems = item.subItems.filter(subItem => userPermissions[subItem.href]?.access !== false);
+        const filteredSubItems = item.subItems.filter(subItem => hasPermission(subItem.href, 'access'));
         if (filteredSubItems.length === 0) return null;
         return { ...item, subItems: filteredSubItems };
       }
       
-      if (userPermissions[item.href]?.access === false) {
+      if (!hasPermission(item.href, 'access')) {
         return null;
       }
       return item;
     }).filter(Boolean) as typeof menuItems;
-  }, [userPermissions, userRole]);
+  }, [hasPermission, isLoading]);
   
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
 
+  // Auto-expand menu based on current path - only when pathname changes
+  const lastPathname = React.useRef(pathname);
+  React.useEffect(() => {
+    if (lastPathname.current !== pathname) {
+        lastPathname.current = pathname;
+        const activeMenu =
+          filteredMenuItems.find(
+            (item) =>
+              item.subItems &&
+              item.subItems.some((sub) => {
+                // Precise matching: either exact match or starts with href followed by a slash
+                return pathname === sub.href || pathname.startsWith(sub.href + "/");
+              })
+          )?.label || null;
+        
+        if (activeMenu) {
+            setOpenMenu(activeMenu);
+        }
+    }
+  }, [pathname, filteredMenuItems]);
+
+  // Initial expand on mount
   React.useEffect(() => {
     const activeMenu =
       filteredMenuItems.find(
         (item) =>
           item.subItems &&
-          item.subItems.some((sub) => pathname.startsWith(sub.href))
+          item.subItems.some((sub) => {
+            return pathname === sub.href || pathname.startsWith(sub.href + "/");
+          })
       )?.label || null;
-    setOpenMenu(activeMenu);
-  }, [pathname, filteredMenuItems]);
+    if (activeMenu) setOpenMenu(activeMenu);
+  }, []); // Run once on mount
 
-  const isSubItemActive = (subItems: any[]) => subItems.some(item => pathname.startsWith(item.href));
+  const isSubItemActive = (subItems: any[]) => subItems.some(sub => pathname === sub.href || pathname.startsWith(sub.href + "/"));
 
   const handleMenuToggle = (label: string) => {
+    if (!open) setOpen(true);
     setOpenMenu(prevMenu => (prevMenu === label ? null : label));
   };
 
@@ -275,18 +285,17 @@ export function SidebarNav() {
             </SidebarMenuItem>
         )
         )}
+        {isLoading && (
+            <div className="px-4 py-2 text-xs text-muted-foreground animate-pulse">
+                {t('Đang tải menu...')}
+            </div>
+        )}
     </SidebarMenu>
   );
 }
 
 export function UserFooter() {
-    const { user: authUser } = useUser();
-    const firestore = useFirestore();
-    const employeeDocRef = React.useMemo(() => {
-        if (!firestore || !authUser) return null;
-        return doc(firestore, 'employees', authUser.uid);
-    }, [firestore, authUser]);
-    const { data: user } = useDoc<Employee>(employeeDocRef);
+    const { user } = usePermissions();
     const { open } = useSidebar();
     
     return (

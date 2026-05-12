@@ -4,6 +4,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useCollection, useFirestore } from '@/firebase';
+import { useMasterData } from '@/providers/master-data-provider';
 import { collection, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import type { ActivityLog, Employee } from '@/lib/types';
 import { useLanguage } from '@/hooks/use-language';
@@ -48,84 +49,35 @@ export default function RecentActivity() {
         [firestore]
     );
     const { data: activities, loading: activitiesLoading } = useCollection<ActivityLog>(activityLogRef);
-    const [enrichedActivities, setEnrichedActivities] = useState<EnrichedActivityLog[]>([]);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const activitiesData = useMemo(() => activities || [], [activities]);
+    const { employeesMap } = useMasterData();
 
-    useEffect(() => {
-        if (activities && firestore && !isProcessing) {
-            const fetchUserDetails = async () => {
-                setIsProcessing(true);
-                try {
-                    const enriched = await Promise.all(activities.map(async (activity) => {
-                        const userId = activity.userId;
-                        
-                        if (!userId || userId === 'system') {
-                            return { ...activity, userName: 'Hệ thống', userAvatar: '' };
-                        }
-                        
-                        // 1. Check persistent cache
-                        if (userCache[userId]) {
-                            const userData = userCache[userId];
-                            return {
-                                ...activity,
-                                userName: userData.name || 'Thành viên',
-                                userAvatar: userData.avatarUrl,
-                            };
-                        }
+    const enrichedActivities = useMemo<EnrichedActivityLog[]>(() => {
+        return activitiesData.map(activity => {
+            const userId = activity.userId;
+            if (!userId || userId === 'system') {
+                return { ...activity, userName: 'Hệ thống', userAvatar: '' };
+            }
 
-                        // 2. Check or create in-flight request
-                        let fetchPromise = pendingRequests.get(userId);
-                        
-                        if (!fetchPromise) {
-                            fetchPromise = (async () => {
-                                try {
-                                    const userRef = doc(firestore, 'employees', userId);
-                                    const userSnap = await getDoc(userRef);
-                                    if (userSnap.exists()) {
-                                        const userData = userSnap.data() as Employee;
-                                        userCache[userId] = userData; // Save to persistent cache
-                                        return userData;
-                                    }
-                                } catch (e: any) {
-                                    // Silence permission-denied errors as they are expected for non-admin users
-                                    if (e.code !== 'permission-denied') {
-                                        console.error("Error fetching activity user:", userId, e);
-                                    }
-                                    // Cache a "hidden" user to prevent repeated forbidden requests
-                                    userCache[userId] = { id: userId, name: '', nickname: '', position: '', birthDate: '', phone: '', role: '', email: '' } as Employee;
-                                } finally {
-                                    pendingRequests.delete(userId);
-                                }
-                                return null;
-                            })();
-                            pendingRequests.set(userId, fetchPromise);
-                        }
+            // Tra cứu thần tốc từ employeesMap của MasterData
+            const userData = employeesMap.get(userId) || (activity.userEmail ? employeesMap.get(activity.userEmail.toLowerCase()) : null);
+            
+            if (userData) {
+                return {
+                    ...activity,
+                    userName: userData.name || 'Thành viên',
+                    userAvatar: userData.avatarUrl,
+                };
+            }
 
-                        const userData = await fetchPromise;
-                        
-                        if (userData && userData.name) {
-                            return {
-                                ...activity,
-                                userName: userData.name,
-                                userAvatar: userData.avatarUrl,
-                            };
-                        }
+            // Fallback nếu không thấy trong master data
+            const fallbackName = activity.userEmail 
+                ? activity.userEmail.split('@')[0] 
+                : `User ${userId.substring(0, 4)}...`;
 
-                        // Fallback to email or masked ID
-                        const fallbackName = activity.userEmail 
-                            ? activity.userEmail.split('@')[0] 
-                            : `User ${userId.substring(0, 4)}...`;
-
-                        return { ...activity, userName: fallbackName, userAvatar: '' };
-                    }));
-                    setEnrichedActivities(enriched);
-                } finally {
-                    setIsProcessing(false);
-                }
-            };
-            fetchUserDetails();
-        }
-    }, [activities, firestore]);
+            return { ...activity, userName: fallbackName, userAvatar: '' };
+        });
+    }, [activitiesData, employeesMap]);
 
     return (
         <Card className="shadow-sm">

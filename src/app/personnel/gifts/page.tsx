@@ -2,22 +2,22 @@
 "use client";
 
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { 
-  PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight, 
-  ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp, 
-  ArrowDown, Filter, X, EllipsisVertical, Save, Library, 
-  Gift, Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter,
-  StickyNote, FileText
+import {
+    PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight,
+    ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp,
+    ArrowDown, Filter, X, EllipsisVertical, Save, Library,
+    Gift, Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter, ChevronDown,
+    StickyNote, FileText
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -40,7 +40,9 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Gift as GiftType } from '@/lib/types';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderGift extends GiftType { renderId: string; }
@@ -86,12 +88,36 @@ const ColumnHeader = ({ columnKey, title, t, sortConfig, openPopover, setOpenPop
 
 const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t }: any) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Bộ lọc nâng cao</DialogTitle><VisuallyHidden><DialogDescription>Lọc danh sách quà tặng</DialogDescription></VisuallyHidden></DialogHeader>
-            <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> Tên quà tặng</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3">
+                    <ListFilter className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                        <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button></DialogFooter>
+
+            <VisuallyHidden><DialogDescription>Lọc danh sách quà tặng</DialogDescription></VisuallyHidden>
+
+            <ScrollArea className="max-h-[70vh]">
+                <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> Tên quà tặng</Label>
+                        <Input value={filters.name || ''} onChange={e => setFilters({ ...filters, name: e.target.value })} placeholder="Nhập tên..." />
+                    </div>
+                </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                </Button>
+                <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 );
@@ -104,8 +130,8 @@ const GiftEditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSav
                 <VisuallyHidden><DialogDescription>Nhập thông tin quà tặng</DialogDescription></VisuallyHidden>
             </DialogHeader>
             <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> {t('Tên quà tặng')} *</Label><Input value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} disabled={mode === 'view'} /></div>
-                <div className="space-y-2"><Label className="flex items-center gap-2"><StickyNote className="h-4 w-4 text-primary" /> {t('Ghi chú')}</Label><Input value={formData.note || ''} onChange={e => setFormData({...formData, note: e.target.value})} disabled={mode === 'view'} /></div>
+                <div className="space-y-2"><Label className="flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> {t('Tên quà tặng')} *</Label><Input value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={mode === 'view'} /></div>
+                <div className="space-y-2"><Label className="flex items-center gap-2"><StickyNote className="h-4 w-4 text-primary" /> {t('Ghi chú')}</Label><Input value={formData.note || ''} onChange={e => setFormData({ ...formData, note: e.target.value })} disabled={mode === 'view'} /></div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={onUndo} disabled={!isChanged || mode === 'view'}><Undo2 className="mr-2 h-4 w-4" /> {t('Hoàn tác')}</Button>
@@ -121,6 +147,7 @@ export default function GiftsPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const collectionRef = useMemo(() => (firestore ? collection(firestore, 'gifts') : null), [firestore]);
     const { data: rawGifts, loading } = useCollection<GiftType>(collectionRef);
+    const { permissions } = usePermissions('/personnel/gifts');
     const data = useMemo(() => (rawGifts || []).map((item, idx) => ({ ...item, renderId: `${item.id || 'no-id'}-${idx}` })) as RenderGift[], [rawGifts]);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -131,7 +158,7 @@ export default function GiftsPage() {
     const [initialFormState, setInitialFormState] = useState<Partial<GiftType>>({});
     const { toast } = useToast();
     const [dialogMode, setDialogMode] = useState<DialogMode>('add');
-    
+
     const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
     const [importingData, setImportingData] = useState<any[]>([]);
     const [isProcessingImport, setIsProcessingImport] = useState(false);
@@ -189,7 +216,7 @@ export default function GiftsPage() {
         const reader = new FileReader();
         reader.onload = (evt) => {
             const bstr = evt.target?.result; const wb = XLSX.read(bstr, { type: 'binary' });
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 7 }); 
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { range: 7 });
             setImportingData(data); setIsImportPreviewOpen(true);
         };
         reader.readAsBinaryString(file); e.target.value = '';
@@ -230,9 +257,18 @@ export default function GiftsPage() {
                                 <div className="flex items-center gap-2">
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+
+                                    {permissions.import && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+
+                                    {permissions.export && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+
+                                    {permissions.add && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    )}
                                 </div>
                             </div>
                         </CardHeader>
@@ -244,7 +280,7 @@ export default function GiftsPage() {
                                             <TableHead className="w-[80px] text-white font-bold text-base text-center border-r border-blue-300">#</TableHead>
                                             {orderedColumns.map(k => (
                                                 <TableHead key={k} className="p-0 border-r border-blue-300 h-auto">
-                                                    <ColumnHeader columnKey={k} title={columnDefs[k]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any,d:any)=>setSortConfig([{key:k,direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any,v:any)=>{setFilters((p:any)=>({...p,[k]:v})); setCurrentPage(1);}} icon={colIcons[k]} />
+                                                    <ColumnHeader columnKey={k} title={columnDefs[k]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k: any, d: any) => setSortConfig([{ key: k, direction: d }])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k: any, v: any) => { setFilters((p: any) => ({ ...p, [k]: v })); setCurrentPage(1); }} icon={colIcons[k]} />
                                                 </TableHead>
                                             ))}
                                             <TableHead className="w-16 text-center text-white font-bold text-base">
@@ -253,27 +289,65 @@ export default function GiftsPage() {
                                                     <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
                                                         <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
                                                         <DropdownMenuSeparator />
-                                                        {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [k]: !!v}))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
+                                                        {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({ ...p, [k]: !!v }))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                                        {loading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                                             const isSelected = selectedSet.has(item.renderId);
                                             return (
-                                                <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/20 hover:bg-yellow-300 transition-all", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
-                                                    <TableCell className="text-center border-r text-inherit align-middle py-3">{startIndex + idx + 1}</TableCell>
-                                                    {orderedColumns.map(k => <TableCell key={k} className="border-r text-inherit align-middle py-3">{String(item[k as keyof GiftType] || '')}</TableCell>)}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
-                                                        <div onClick={e => e.stopPropagation()}>
-                                                            <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                                        </div>
+                                                <TableRow
+                                                    key={item.renderId}
+                                                    onClick={() => handleRowClick(item.renderId)}
+                                                    data-state={isSelected ? "selected" : ""}
+                                                    className={cn(
+                                                        "cursor-pointer transition-colors hover:bg-slate-50",
+                                                        isSelected && "bg-blue-50/50"
+                                                    )}
+                                                >
+                                                    <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
+                                                    {orderedColumns.map(columnKey => (
+                                                        <TableCell key={columnKey} className="border-r max-w-[300px]">
+                                                            {columnKey === 'name' ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                                                        <Gift className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-800">{item.name}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-600 line-clamp-2">{(item as any)[columnKey] || '---'}</span>
+                                                            )}
+                                                        </TableCell>
+                                                    ))}
+                                                    <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l p-0 text-center">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('view', item); }}><Eye className="mr-2 h-4 w-4" /> Xem chi tiết</DropdownMenuItem>
+                                                                {permissions.edit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('edit', item); }}><Edit className="mr-2 h-4 w-4" /> Chỉnh sửa</DropdownMenuItem>}
+                                                                {permissions.add && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('copy', item); }}><Copy className="mr-2 h-4 w-4" /> Nhân bản</DropdownMenuItem>}
+                                                                {permissions.delete && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Xoá</DropdownMenuItem>}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState
+                                                colSpan={orderedColumns.length + 2}
+                                                icon={Gift}
+                                                title={t('Không tìm thấy quà tặng')}
+                                                filters={filters}
+                                                onClearFilters={() => setFilters({})}
+                                            />
+                                        )}
+
                                     </TableBody>
                                 </Table>
                             </div>
@@ -291,11 +365,11 @@ export default function GiftsPage() {
                                     </Select>
                                 </div>
                                 <div className="flex gap-1">
-                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={()=>setCurrentPage(1)} disabled={safeCurrentPage===1}><ChevronsLeft className="h-4 w-4"/></Button>
-                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={()=>setCurrentPage(Math.max(1, safeCurrentPage-1))} disabled={safeCurrentPage===1}><ChevronLeft className="h-4 w-4"/></Button>
-                                    <div className="flex items-center gap-1 font-medium text-sm"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value); if(p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
-                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={()=>setCurrentPage(Math.min(totalPages, safeCurrentPage+1))} disabled={safeCurrentPage===totalPages}><ChevronRight className="h-4 w-4"/></Button>
-                                    <Button variant="outline" size="icon" className="h-8 w-8 p-0" onClick={()=>setCurrentPage(totalPages)} disabled={safeCurrentPage===totalPages}><ChevronsRight className="h-4 w-4"/></Button>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(1)} disabled={safeCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))} disabled={safeCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                                    <div className="flex items-center gap-1 font-medium text-sm"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value); if (p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
+                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))} disabled={safeCurrentPage === totalPages}><ChevronRight className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" className="h-8 w-8 p-0" onClick={() => setCurrentPage(totalPages)} disabled={safeCurrentPage === totalPages}><ChevronsRight className="h-4 w-4" /></Button>
                                 </div>
                             </div>
                         </CardFooter>
@@ -313,7 +387,7 @@ export default function GiftsPage() {
                     </DialogContent>
                 </Dialog>
 
-                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction className="bg-destructive" onClick={async ()=>{ if(selectedItem && firestore){ await deleteDoc(doc(firestore, "gifts", selectedItem.id)); toast({title: t("Thành công")}); } setIsDeleteDialogOpen(false);}}>Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction className="bg-destructive" onClick={async () => { if (selectedItem && firestore) { await deleteDoc(doc(firestore, "gifts", selectedItem.id)); toast({ title: t("Thành công") }); } setIsDeleteDialogOpen(false); }}>Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
             </TooltipProvider>
         </ClientOnly>
     );

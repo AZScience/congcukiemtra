@@ -33,7 +33,7 @@ function getDynamicModel(apiKey?: string, modelName?: string, apiVersion: 'v1' |
 
     const genAI = new GoogleGenerativeAI(key);
 
-    let name = (modelName || "gemini-2.0-flash").trim();
+    let name = (modelName || "gemini-1.5-flash").trim();
     name = name.replace(/^models\//, "");
 
     return genAI.getGenerativeModel(
@@ -43,12 +43,18 @@ function getDynamicModel(apiKey?: string, modelName?: string, apiVersion: 'v1' |
 }
 
 function normalizePrivateKey(raw: string): string {
-    const pem = raw.replace(/\\n/g, '\n');
+    if (!raw) return "";
+    let cleaned = raw.trim();
+    // 1. Loại bỏ dấu ngoặc kép nếu người dùng copy cả dấu ngoặc từ file JSON
+    cleaned = cleaned.replace(/^"|"$/g, '');
+    // 2. Thay thế các ký tự \n viết liền thành dấu xuống dòng thực tế
+    cleaned = cleaned.replace(/\\n/g, '\n');
+    
     try {
         // Convert to PKCS#8 for OpenSSL 3 compatibility (Node.js 18+)
-        return createPrivateKey(pem).export({ type: 'pkcs8', format: 'pem' }) as string;
-    } catch {
-        return pem;
+        return createPrivateKey(cleaned).export({ type: 'pkcs8', format: 'pem' }) as string;
+    } catch (e) {
+        return cleaned;
     }
 }
 
@@ -128,9 +134,9 @@ export const assistantFlow = ai.defineFlow(
             const messageParts = [{ text: finalQuestion }];
 
             // 2. Retry logic across different models and versions to prevent 404/403/429
-            const requestedModel = (input.aiModel || "gemini-2.0-flash").trim().replace(/^models\//, "");
-            // Priority order: requested -> 2.0-flash -> 1.5-flash (more stable quota) -> 2.0-flash-lite
-            const fallbackModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"];
+            // Priority order: requested -> 1.5-flash (stable) -> 1.5-flash-8b (lightweight) -> 2.0-flash (fast) -> 2.0-flash-lite
+            const requestedModel = (input.aiModel || "gemini-1.5-flash").trim().replace(/^models\//, "");
+            const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
             const modelQueue = Array.from(new Set([requestedModel, ...fallbackModels]));
             const modelsToTry = modelQueue.map(name => ({ name, version: 'v1beta' as const }));
 
@@ -157,6 +163,10 @@ export const assistantFlow = ai.defineFlow(
                     if (e.message.includes("429") || e.message.includes("quota")) {
                         isQuotaExceeded = true;
                     }
+                    
+                    if (e.message.includes("payment") || e.message.includes("funds") || e.message.includes("OR_FGVEM_40")) {
+                        throw new Error("Lỗi thanh toán Google Cloud: Tài khoản của bạn hết số dư hoặc thẻ bị từ chối (Mã: OR_FGVEM_40). Vui lòng kiểm tra lại cấu hình Billing trong Google Cloud Console.");
+                    }
 
                     if (e.message.includes("API_KEY_INVALID") || e.message.includes("identity")) break;
                     continue;
@@ -164,7 +174,7 @@ export const assistantFlow = ai.defineFlow(
             }
 
             if (isQuotaExceeded) {
-                throw new Error("Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút hoặc đổi sang Model khác (ví dụ: gemini-1.5-flash) trong Cài đặt.");
+                throw new Error("Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút, đổi sang Model khác (ví dụ: gemini-1.5-flash-8b) hoặc kiểm tra lại giới hạn của API Key trong Google AI Studio.");
             }
 
             throw new Error(lastError || "Tất cả các model đều không phản hồi.");

@@ -11,10 +11,11 @@ import {
   EllipsisVertical, Save, Filter, Eye, ListFilter, Check, 
   CheckCircle2, ChevronsUpDown, ChevronsLeft, ChevronLeft, ChevronRight,
   ChevronsRight, FileDown, Ban, CalendarDays, Map, Hash, User, UserCheck, StickyNote, CloudUpload, CloudDownload,
-  IdCard, GraduationCap, Phone, Activity, Building2, MessageSquare, Gift, ChevronDown, Trash2, FileText
+  IdCard, GraduationCap, Phone, Activity, Building2, MessageSquare, Gift, ChevronDown, Trash2, FileText, History
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import { usePermissions } from "@/hooks/use-permissions";
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
   DropdownMenuSeparator, DropdownMenuCheckboxItem, 
@@ -40,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useLanguage } from "@/hooks/use-language";
 import * as XLSX from 'xlsx';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'edit' | 'view';
 interface RenderReception extends AssetReception { renderId: string; }
@@ -133,126 +135,73 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, allBloc
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8">
-                        <DialogTitle className="flex items-center gap-2">
-                            <ListFilter className="h-5 w-5 text-primary" />
-                            Bộ lọc nâng cao
-                        </DialogTitle>
-                        <div className="flex gap-2">
-                            {isNamingPreset ? (
-                                <div className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="Tên bộ lọc..." 
-                                        className="h-8 w-40 text-xs" 
-                                        value={newPresetName} 
-                                        onChange={e => setNewPresetName(e.target.value)} 
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                    />
-                                    <Button 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => {
-                                            if (newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                        disabled={isSaving}
-                                    >
-                                        <Check className="h-3 w-3 mr-1" /> Lưu
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => setIsNamingPreset(false)}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
+            <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                <div className="flex items-center justify-between border-b pl-4 pr-12 py-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                        <ListFilter className="h-5 w-5 text-primary" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                                    <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
-                            ) : (
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50"
-                                    onClick={() => setIsNamingPreset(true)}
-                                >
-                                    <CloudUpload className="mr-1 h-3 w-3" /> Lưu bộ lọc mới
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                    <VisuallyHidden><DialogDescription>Lọc danh sách.</DialogDescription></VisuallyHidden>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-                    {/* Presets Sidebar */}
-                    <div className="border-r pr-2 py-4 hidden md:block overflow-y-auto max-h-[70vh]">
-                        <div className="px-3 mb-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Bộ lọc đã lưu</span>
-                            <span className="bg-primary/10 text-primary px-1.5 rounded-full">{presets?.length || 0}</span>
-                        </div>
-                        <div className="space-y-1 px-1">
-                            {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
-                                <div key={idx} className="group flex items-center gap-1 rounded-md hover:bg-muted p-1 transition-colors">
-                                    <Button 
-                                        variant="ghost" 
-                                        className="flex-1 justify-start h-8 text-xs font-medium px-2 py-1 text-left truncate overflow-hidden"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10"
-                                        onClick={() => onDeleteCloud(preset.name)}
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            )) : (
-                                <p className="text-[10px] text-muted-foreground px-3 py-4 text-center italic">Chưa có bộ lọc nào.</p>
-                            )}
-                        </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-64">
+                                <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <History className="h-3.5 w-3.5" /> Bộ lọc đã lưu
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
+                                        <div key={idx} className="flex items-center group/item px-1">
+                                            <DropdownMenuItem className="flex-1 cursor-pointer" onSelect={() => setFilters(preset.filters)}>
+                                                <span className="truncate">{preset.name}</span>
+                                            </DropdownMenuItem>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); onDeleteCloud(preset.name); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    )) : (
+                                        <div className="px-2 py-4 text-center italic text-[10px] text-muted-foreground">Chưa có bộ lọc nào</div>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
-                    <ScrollArea className="max-h-[70vh] col-span-2">
-                        {/* Mobile Presets (Horizontal) */}
-                        <div className="md:hidden p-4 border-b">
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase mb-2 block">Bộ lọc đã lưu</Label>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {presets?.map((preset: any, idx: number) => (
-                                    <Badge 
-                                        key={idx} 
-                                        variant="secondary" 
-                                        className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Badge>
-                                ))}
+                    <div className="flex items-center gap-2">
+                        {isNamingPreset ? (
+                            <div className="flex items-center gap-1">
+                                <Input placeholder="Tên bộ lọc..." className="h-8 w-32 text-xs" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} />
+                                <Button size="sm" className="h-8 px-2" onClick={() => { if (newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} disabled={isSaving}><Check className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setIsNamingPreset(false)}><X className="h-3 w-3" /></Button>
                             </div>
-                        </div>
+                        ) : (
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-primary hover:bg-primary/10" onClick={() => setIsNamingPreset(true)}>
+                                <CloudUpload className="mr-1.5 h-3.5 w-3.5" /> Lưu hiện tại
+                            </Button>
+                        )}
+                    </div>
+                </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                <VisuallyHidden><DialogDescription>Cấu hình bộ lọc nâng cao.</DialogDescription></VisuallyHidden>
+
+                <ScrollArea className="max-h-[70vh]">
+                    <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2"><Label className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Ngày trả/tiếp</Label><DatePickerField value={filters.date} onChange={val => setFilters({...filters, date: val || ''})} className="h-9" /></div>
                             <div className="space-y-2"><Label className="flex items-center gap-2"><Map className="h-4 w-4 text-primary" /> Dãy nhà (Chọn nhiều)</Label><MultiSelect options={allBlocks?.map((b: any) => ({ label: b.name, value: b.name })) || []} selected={filters.buildings} onChange={(v: any) => setFilters({...filters, buildings: v})} placeholder="Chọn dãy nhà..." emptyText="Không có dữ liệu" /></div>
                         </div>
-                    </ScrollArea>
-                </div>
-                <DialogFooter className="p-4 border-t">
-                    <Button variant="outline" onClick={() => setFilters({ date: format(new Date(), 'yyyy-MM-dd'), buildings: [] })}><Undo2 className="mr-2 h-4 w-4" />Xóa tất cả</Button>
-                    <Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button>
+                    </div>
+                </ScrollArea>
+
+                <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setFilters({ date: format(new Date(), 'yyyy-MM-dd'), buildings: [] })} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                    </Button>
+                    <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -481,13 +430,15 @@ const EditDialog = ({ open, onOpenChange, mode, formData, setFormData, onSave, o
     );
 };
 
-export default function ReturnTab() {
+export default function ReturnTab({ advancedFilters, setAdvancedFilters }: any) {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { user: authUser } = useUser();
     const { toast } = useToast();
+    const { permissions } = usePermissions('/monitoring/asset-check');
     
-    const [advancedFilters, setAdvancedFilters] = useLocalStorage<{date: string, buildings: string[]}>('return_advanced_filters_v3', { date: format(new Date(), 'yyyy-MM-dd'), buildings: [] });
+    // advancedFilters lifted to parent
+
     const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
     
     // Advanced filter states defined above
@@ -699,7 +650,7 @@ export default function ReturnTab() {
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600">
+                                    <Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600" disabled={!permissions.export}>
                                         <FileDown className="h-5 w-5" />
                                     </Button>
                                 </TooltipTrigger>
@@ -716,7 +667,7 @@ export default function ReturnTab() {
                             <TableRow className="bg-[#1877F2] hover:bg-[#1877F2]/90">
                                 <TableHead className="w-[80px] font-bold text-base text-white text-center border-r border-blue-300">#</TableHead>
                                 {orderedColumns.map(key => (<TableHead key={key} className="text-white border-r border-blue-300 p-0 h-auto"><ColumnHeader columnKey={key} title={columnDefs[key].title} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any, d:any)=>setSortConfig([{key:k, direction:d}])} clearSort={()=>setSortConfig([])} filters={filters} handleFilterChange={(k:any, v:string) => { setFilters(p => ({...p,[k]:v})); setCurrentPage(1); }} icon={colIcons[key]} /></TableHead>))}
-                                <TableHead className="w-16 text-center text-white font-bold text-base"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel><DropdownMenuSeparator />{allColumns.map(key => (<DropdownMenuCheckboxItem key={key} checked={columnVisibility[key]} onCheckedChange={v => setColumnVisibility(prev => ({...prev, [key]: !!v}))}>{t(columnDefs[key].title)}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu></TableHead>
+                                <TableHead className="w-16 text-center text-white font-bold text-base sticky right-0 bg-[#1877F2] z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel><DropdownMenuSeparator />{allColumns.map(key => (<DropdownMenuCheckboxItem key={key} checked={columnVisibility[key]} onCheckedChange={v => setColumnVisibility(prev => ({...prev, [key]: !!v}))}>{t(columnDefs[key].title)}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -732,7 +683,7 @@ export default function ReturnTab() {
                                                 {String(item[key as keyof AssetReception] ?? '')}
                                             </TableCell>
                                         ))}
-                                        <TableCell className="text-center py-3">
+                                        <TableCell className="text-center py-3 sticky right-0 bg-white group-hover:bg-yellow-300 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]">
                                             <div onClick={e => e.stopPropagation()}>
                                                 <DropdownMenu modal={false}>
                                                     <DropdownMenuTrigger asChild>
@@ -742,7 +693,7 @@ export default function ReturnTab() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onSelect={() => openDialog('view', item)}><Eye className="mr-2 h-4 w-4" />Chi tiết</DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Undo2 className="mr-2 h-4 w-4" />Trả tài sản</DropdownMenuItem>
+                                                        {permissions.edit && <DropdownMenuItem onSelect={() => openDialog('edit', item)}><Undo2 className="mr-2 h-4 w-4" />Trả tài sản</DropdownMenuItem>}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
@@ -750,8 +701,22 @@ export default function ReturnTab() {
                                     </TableRow>
                                 );
                             }) : (
-                                <TableRow><TableCell colSpan={orderedColumns.length + 2} className="h-24 text-center">Không có dữ liệu.</TableCell></TableRow>
+                                <DataTableEmptyState 
+                                    colSpan={orderedColumns.length + 2} 
+                                    icon={Undo2}
+                                    title="Không tìm thấy phiếu trao trả"
+                                    filters={{ ...filters, ...advancedFilters }}
+                                    onClearFilters={() => {
+                                        setFilters({});
+                                        setAdvancedFilters({
+                                            date: format(new Date(), 'yyyy-MM-dd'),
+                                            buildings: []
+                                        });
+                                    }}
+                                />
                             )}
+
+
                         </TableBody>
                     </Table>
                 </div>

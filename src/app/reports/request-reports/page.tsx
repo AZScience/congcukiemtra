@@ -46,11 +46,12 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, sortConfig, openPopover, s
                     <span className="truncate flex-1 text-left">{title}</span>
                     {sortState ? (
                         sortState.direction === 'asc' ? 
-                        <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} /> : 
-                        <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-300")} />
+                        <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> : 
+                        <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "hover:opacity-100")} />
                     )}
+
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0 shadow-2xl border-blue-100" align="start">
@@ -186,7 +187,7 @@ export default function RequestReportsPage() {
   const [toDate, setToDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
-  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(true);
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
   
   const { blocks, employees } = useMasterData();
 
@@ -461,7 +462,7 @@ export default function RequestReportsPage() {
                       </TableHead>
                     );
                   })}
-                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2]/95 border-l border-blue-300">
+                  <TableHead className="w-16 text-center text-white p-0 bg-[#1877F2] border-l border-blue-300 sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-blue-700/50 transition-colors">
@@ -516,7 +517,7 @@ export default function RequestReportsPage() {
                         {item.status}
                       </TableCell>
                     )}
-                    <TableCell className="p-2 text-center border-l bg-blue-50/5"></TableCell>
+                    <TableCell className="p-2 text-center border-l bg-blue-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>

@@ -4,11 +4,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, writeBatch, collection } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
-const getDb = () => {
-    const apps = getApps();
-    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-    return getFirestore(app);
-};
+import { db } from '@/lib/firebase';
+const getDb = () => db;
 
 export async function POST(request: Request) {
     // 1. Xác thực API Key

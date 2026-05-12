@@ -22,7 +22,8 @@ import PageHeader from "@/components/page-header";
 import { ClientOnly } from "@/components/client-only";
 import { useLanguage } from "@/hooks/use-language";
 import { useCollection, useFirestore } from "@/firebase";
-import { collection, doc, updateDoc, deleteField } from "firebase/firestore";
+import { usePermissions } from "@/hooks/use-permissions";
+import { collection, doc, updateDoc, deleteField, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { useMasterData } from "@/providers/master-data-provider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,10 +32,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useToast } from "@/hooks/use-toast";
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 // --- Types ---
 
-type EvidenceSource = 'direct' | 'online' | 'homeroom' | 'checkin' | 'feedback' | 'shift_schedule' | 'requests' | 'petitions' | 'asset_check' | 'violations' | 'exams' | 'practice';
+type EvidenceSource = 'direct' | 'online' | 'homeroom' | 'checkin' | 'feedback' | 'shift_schedule' | 'requests' | 'petitions' | 'asset_check' | 'violations' | 'exams' | 'practice' | 'document_records';
 
 interface UnifiedEvidence {
     id: string;
@@ -55,14 +57,17 @@ export default function EvidenceManagementPage() {
     const { t } = useLanguage();
     const firestore = useFirestore();
     const { employees } = useMasterData();
+    const { permissions } = usePermissions('/monitoring/evidence');
 
-    // --- Collections ---
-    const schedulesRef = useMemo(() => firestore ? collection(firestore, 'schedules') : null, [firestore]);
-    const checkinsRef = useMemo(() => firestore ? collection(firestore, 'external_checkins') : null, [firestore]);
-    const requestsRef = useMemo(() => firestore ? collection(firestore, 'requests') : null, [firestore]);
-    const petitionsRef = useMemo(() => firestore ? collection(firestore, 'petitions') : null, [firestore]);
-    const assetRef = useMemo(() => firestore ? collection(firestore, 'asset-receptions') : null, [firestore]);
-    const violationsRef = useMemo(() => firestore ? collection(firestore, 'student-violations') : null, [firestore]);
+    // --- Collections Optimized ---
+    const schedulesRef = useMemo(() => firestore ? query(collection(firestore, 'schedules'), orderBy('date', 'desc'), limit(100)) : null, [firestore]);
+    const checkinsRef = useMemo(() => firestore ? query(collection(firestore, 'external_checkins'), orderBy('timestamp', 'desc'), limit(50)) : null, [firestore]);
+    const requestsRef = useMemo(() => firestore ? query(collection(firestore, 'requests'), orderBy('requestDate', 'desc'), limit(50)) : null, [firestore]);
+    const petitionsRef = useMemo(() => firestore ? query(collection(firestore, 'petitions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const assetRef = useMemo(() => firestore ? query(collection(firestore, 'asset-receptions'), orderBy('receptionDate', 'desc'), limit(50)) : null, [firestore]);
+    const violationsRef = useMemo(() => firestore ? query(collection(firestore, 'student-violations'), orderBy('violationDate', 'desc'), limit(50)) : null, [firestore]);
+    const documentRecordsRef = useMemo(() => firestore ? query(collection(firestore, 'document_records'), orderBy('receivedDate', 'desc'), limit(50)) : null, [firestore]);
+    const shiftScheduleRef = useMemo(() => firestore ? doc(firestore, 'system_settings', 'shift_schedule') : null, [firestore]);
 
     const { data: schedulesData, loading: loadingSchedules } = useCollection<any>(schedulesRef);
     const { data: checkinsData, loading: loadingCheckins } = useCollection<any>(checkinsRef);
@@ -70,8 +75,21 @@ export default function EvidenceManagementPage() {
     const { data: petitionsData, loading: loadingPetitions } = useCollection<any>(petitionsRef);
     const { data: assetData, loading: loadingAsset } = useCollection<any>(assetRef);
     const { data: violationsData, loading: loadingViolations } = useCollection<any>(violationsRef);
+    const { data: documentRecordsData, loading: loadingDocumentRecords } = useCollection<any>(documentRecordsRef);
+    
+    const [shiftScheduleData, setShiftScheduleData] = useState<any>(null);
+    const [loadingShiftSchedule, setLoadingShiftSchedule] = useState(true);
 
-    const isLoading = loadingSchedules || loadingCheckins || loadingRequests || loadingPetitions || loadingAsset || loadingViolations;
+    useEffect(() => {
+        if (!shiftScheduleRef) return;
+        const unsubscribe = onSnapshot(shiftScheduleRef, (docSnap) => {
+            if (docSnap.exists()) setShiftScheduleData(docSnap.data());
+            setLoadingShiftSchedule(false);
+        });
+        return () => unsubscribe();
+    }, [shiftScheduleRef]);
+
+    const isLoading = loadingSchedules || loadingCheckins || loadingRequests || loadingPetitions || loadingAsset || loadingViolations || loadingDocumentRecords || loadingShiftSchedule;
 
     // --- State ---
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -294,9 +312,61 @@ export default function EvidenceManagementPage() {
             });
         }
 
+        // 7. From document_records (Quản lý hồ sơ)
+        if (documentRecordsData) {
+            documentRecordsData.forEach(item => {
+                if (item.originalFile) {
+                    const evidenceList = item.originalFile.split('|').filter(Boolean);
+                    if (evidenceList.length > 0) {
+                        let dateObj = new Date();
+                        if (item.receivedDate) {
+                            const parts = item.receivedDate.split('-');
+                            if (parts.length === 3) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        }
+
+                        unified.push({
+                            id: `docrecord-${item.id}`,
+                            source: 'document_records',
+                            sourceLabel: 'Quản lý hồ sơ',
+                            title: `${item.docNumber || 'Văn bản'} - ${item.title}`,
+                            description: item.abstract || 'Tài liệu hồ sơ văn bản',
+                            date: dateObj,
+                            dateStr: item.receivedDate || format(dateObj, 'yyyy-MM-dd'),
+                            submittedBy: item.assignee || 'N/A',
+                            submittedByName: item.assignee || 'N/A',
+                            items: evidenceList,
+                            status: item.status,
+                            originalData: item
+                        });
+                    }
+                }
+            });
+        }
+
+        // 8. From system_settings/shift_schedule (Lịch trực)
+        if (shiftScheduleData && shiftScheduleData.url) {
+            let dateObj = new Date();
+            if (shiftScheduleData.updatedAt) dateObj = new Date(shiftScheduleData.updatedAt);
+
+            unified.push({
+                id: `shiftschedule-shift_schedule`,
+                source: 'shift_schedule',
+                sourceLabel: 'Lịch trực hệ thống',
+                title: `Lịch trực: ${shiftScheduleData.name || 'Bản mới nhất'}`,
+                description: `Cập nhật lần cuối: ${format(dateObj, 'HH:mm dd/MM/yyyy')}`,
+                date: dateObj,
+                dateStr: format(dateObj, 'dd/MM/yyyy'),
+                submittedBy: shiftScheduleData.updatedBy || 'System',
+                submittedByName: employees.find(e => e.id === shiftScheduleData.updatedBy)?.name || 'Hệ thống',
+                items: [shiftScheduleData.url],
+                status: 'Bản chính thức',
+                originalData: shiftScheduleData
+            });
+        }
+
         // Sort by date descending
         return unified.sort((a, b) => b.date.getTime() - a.date.getTime());
-    }, [schedulesData, checkinsData, requestsData, petitionsData, assetData, violationsData]);
+    }, [schedulesData, checkinsData, requestsData, petitionsData, assetData, violationsData, documentRecordsData, shiftScheduleData]);
 
     // --- Filtering ---
     const filteredEvidence = useMemo(() => {
@@ -384,6 +454,14 @@ export default function EvidenceManagementPage() {
                 case 'violations':
                     collectionName = 'student-violations';
                     // This is complex as it has 3 fields. We'll clear all photos.
+                    break;
+                case 'document_records':
+                    collectionName = 'document_records';
+                    updateField = 'originalFile';
+                    break;
+                case 'shift_schedule':
+                    collectionName = 'system_settings';
+                    updateField = 'url';
                     break;
             }
 
@@ -490,6 +568,8 @@ export default function EvidenceManagementPage() {
                                     <SelectItem value="petitions">Tiếp nhận đơn thư</SelectItem>
                                     <SelectItem value="asset_check">Nhận - Trả tài sản</SelectItem>
                                     <SelectItem value="violations">Sinh viên vi phạm</SelectItem>
+                                    <SelectItem value="document_records">Quản lý hồ sơ</SelectItem>
+                                    <SelectItem value="shift_schedule">Lịch trực hệ thống</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -520,15 +600,23 @@ export default function EvidenceManagementPage() {
                         <p className="text-muted-foreground animate-pulse">Đang nạp dữ liệu minh chứng...</p>
                     </div>
                 ) : filteredEvidence.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border border-dashed border-slate-300">
-                        <div className="bg-slate-100 p-6 rounded-full mb-4">
-                            <ImageIcon className="h-12 w-12 text-slate-300" />
-                        </div>
-                        <p className="text-slate-500 font-medium text-lg">Không tìm thấy minh chứng nào phù hợp</p>
-                        <p className="text-slate-400 text-sm">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-                        <Button variant="link" onClick={() => { setSearchTerm(''); setFilterSource('all'); setFilterDate(''); }} className="mt-2">
-                            Xóa tất cả bộ lọc
-                        </Button>
+                    <div className="bg-white rounded-xl border border-dashed border-slate-300 overflow-hidden shadow-sm">
+                        <Table>
+                            <TableBody>
+                                <DataTableEmptyState 
+                                    colSpan={1} 
+                                    icon={ImageIcon}
+                                    title="Không tìm thấy minh chứng nào phù hợp"
+                                    filters={{ searchTerm, filterSource, filterDate }}
+                                    onClearFilters={() => {
+                                        setSearchTerm('');
+                                        setFilterSource('all');
+                                        setFilterDate('');
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </TableBody>
+                        </Table>
                     </div>
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -567,7 +655,9 @@ export default function EvidenceManagementPage() {
                                             item.source === 'requests' ? 'bg-sky-600' : 
                                             item.source === 'petitions' ? 'bg-teal-600' : 
                                             item.source === 'asset_check' ? 'bg-orange-600' : 
-                                            item.source === 'violations' ? 'bg-red-600' : 'bg-slate-600'
+                                            item.source === 'violations' ? 'bg-red-600' : 
+                                            item.source === 'document_records' ? 'bg-blue-800' : 
+                                            item.source === 'shift_schedule' ? 'bg-slate-900' : 'bg-slate-600'
                                         )}>
                                             {item.sourceLabel}
                                         </Badge>
@@ -587,14 +677,16 @@ export default function EvidenceManagementPage() {
                                             <span className="text-[10px] font-medium">{item.submittedByName}</span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {permissions.delete && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                             <div className="flex items-center gap-1.5 text-slate-400 ml-1">
                                                 <Clock className="h-3 w-3" />
                                                 <span className="text-[10px] font-medium">{item.dateStr}</span>
@@ -615,7 +707,7 @@ export default function EvidenceManagementPage() {
                                     <TableHead>Đối tượng / Nội dung</TableHead>
                                     <TableHead className="w-[150px]">Người cập nhật</TableHead>
                                     <TableHead className="w-[120px]">Ngày</TableHead>
-                                    <TableHead className="w-[120px] text-right">Tác vụ</TableHead>
+                                    <TableHead className="w-[120px] text-right sticky right-0 z-20 bg-slate-50 shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-400">Tác vụ</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -649,7 +741,9 @@ export default function EvidenceManagementPage() {
                                                 item.source === 'requests' ? 'text-sky-600 border-sky-100 bg-sky-50' : 
                                                 item.source === 'petitions' ? 'text-teal-600 border-teal-100 bg-teal-50' : 
                                                 item.source === 'asset_check' ? 'text-orange-600 border-orange-100 bg-orange-50' : 
-                                                item.source === 'violations' ? 'text-red-600 border-red-100 bg-red-50' : 'text-slate-600 border-slate-100 bg-slate-50'
+                                                item.source === 'violations' ? 'text-red-600 border-red-100 bg-red-50' : 
+                                                item.source === 'document_records' ? 'text-blue-800 border-blue-100 bg-blue-50' : 
+                                                item.source === 'shift_schedule' ? 'text-slate-900 border-slate-200 bg-slate-100' : 'text-slate-600 border-slate-100 bg-slate-50'
                                             )}>
                                                 {item.sourceLabel}
                                             </Badge>
@@ -662,19 +756,21 @@ export default function EvidenceManagementPage() {
                                         </TableCell>
                                         <TableCell className="text-xs font-medium text-slate-600">{item.submittedByName}</TableCell>
                                         <TableCell className="text-xs text-slate-500">{item.dateStr}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right sticky right-0 z-10 bg-white group-hover:bg-blue-50 shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100">
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {permissions.delete && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -763,7 +859,9 @@ export default function EvidenceManagementPage() {
                                             selectedEvidence?.source === 'requests' ? 'bg-sky-600' : 
                                             selectedEvidence?.source === 'petitions' ? 'bg-teal-600' : 
                                             selectedEvidence?.source === 'asset_check' ? 'bg-orange-600' : 
-                                            selectedEvidence?.source === 'violations' ? 'bg-red-600' : 'bg-slate-600'
+                                            selectedEvidence?.source === 'violations' ? 'bg-red-600' : 
+                                            selectedEvidence?.source === 'document_records' ? 'bg-blue-800' : 
+                                            selectedEvidence?.source === 'shift_schedule' ? 'bg-slate-900' : 'bg-slate-600'
                                         )}>
                                             {selectedEvidence?.sourceLabel}
                                         </Badge>
