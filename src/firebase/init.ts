@@ -15,16 +15,26 @@ export function initializeFirebase(config: FirebaseOptions = firebaseConfig) {
   
   let firestore;
   try {
-    // Ưu tiên WebSockets cho tính realtime tối ưu, chỉ dùng Long Polling nếu bị chặn
-    // Bật lại bộ nhớ đệm (Local Cache) để tải dữ liệu cực nhanh từ đĩa
-    firestore = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
-    });
+    const isBrowser = typeof window !== 'undefined';
+    if (isBrowser) {
+      firestore = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        }),
+        experimentalForceLongPolling: true
+      });
+    } else {
+      firestore = initializeFirestore(app, {
+        experimentalForceLongPolling: true
+      });
+    }
   } catch (e: any) {
     console.warn("Firestore initialization warning (falling back to default):", e.message);
-    firestore = getFirestore(app);
+    try {
+      firestore = initializeFirestore(app, { experimentalForceLongPolling: true });
+    } catch {
+      firestore = getFirestore(app);
+    }
   }
   
   const storage = getStorage(app, config.storageBucket);

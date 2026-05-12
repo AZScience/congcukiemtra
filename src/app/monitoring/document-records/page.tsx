@@ -203,6 +203,8 @@ export default function DocumentRecordsPage() {
     const firebaseApp = useFirebaseApp();
     const storage = useStorage();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const importExcelInputRef = useRef<HTMLInputElement>(null);
+    const [isImporting, setIsImporting] = useState(false);
     
     const [currentPage, setCurrentPage] = useLocalStorage('doc_records_page_v1', 1);
     const [rowsPerPage, setRowsPerPage] = useLocalStorage('doc_records_rows_v1', 10);
@@ -576,10 +578,115 @@ export default function DocumentRecordsPage() {
             'Mã văn bản': item.docCode, 'Số/ký hiệu': item.docNumber, 'Tiêu đề': item.title, 'Trích yếu': item.abstract,
             'Loại văn bản': item.docType, 'Ngày ban hành': item.issueDate, 'Ngày nhận': item.receivedDate,
             'Cơ quan ban hành': item.issuingBody, 'Người ký': item.signer, 'Phòng ban xử lý': item.department,
-            'Người phụ trách': item.assignee, 'Độ khẩn': item.urgency, 'Độ mật': item.confidentiality, 'Trạng thái': item.status
+            'Người phụ trách': item.assignee, 'Độ khẩn': item.urgency, 'Độ mật': item.confidentiality, 'Mật khẩu': (item as any).filePassword || '', 'Trạng thái': item.status,
+            'Đường dẫn file': item.originalFile || ''
         }));
         const ws = XLSX.utils.json_to_sheet(exportData); const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Documents"); XLSX.writeFile(wb, `DS_HoSoVanBan_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    };
+
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !firestore) return;
+
+        setIsImporting(true);
+        toast({ title: t('Đang nhập dữ liệu...'), description: t('Vui lòng chờ trong giây lát.') });
+        
+        try {
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (json.length === 0) {
+                        toast({ title: t('File trống'), description: t('Không tìm thấy dữ liệu hợp lệ trong file Excel.'), variant: 'destructive' });
+                        return;
+                    }
+
+                    let successCount = 0;
+                    for (const row of json) {
+                        const newDoc: any = {
+                            docCode: row['Mã văn bản'] || `CV-${format(new Date(), 'yyyy')}-${Math.floor(Math.random() * 10000)}`,
+                            docNumber: String(row['Số/ký hiệu'] || ''),
+                            title: String(row['Tiêu đề'] || ''),
+                            abstract: String(row['Trích yếu'] || ''),
+                            docType: String(row['Loại văn bản'] || ''),
+                            issueDate: row['Ngày ban hành'] ? String(row['Ngày ban hành']) : '',
+                            receivedDate: row['Ngày nhận'] ? String(row['Ngày nhận']) : '',
+                            issuingBody: String(row['Cơ quan ban hành'] || ''),
+                            signer: String(row['Người ký'] || ''),
+                            department: String(row['Phòng ban xử lý'] || ''),
+                            assignee: String(row['Người phụ trách'] || ''),
+                            urgency: String(row['Độ khẩn'] || 'Thường'),
+                            confidentiality: String(row['Độ mật'] || 'Thường'),
+                            filePassword: String(row['Mật khẩu'] || ''),
+                            status: String(row['Trạng thái'] || 'Mới'),
+                            originalFile: String(row['Đường dẫn file'] || ''),
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                        };
+
+                        const newId = doc(collection(firestore, 'document_records')).id;
+                        newDoc.id = newId;
+                        await setDoc(doc(firestore, "document_records", newId), newDoc, { merge: true });
+                        successCount++;
+                    }
+
+                    toast({ title: t('Nhập dữ liệu thành công'), description: `Đã nhập ${successCount} hồ sơ vào hệ thống.` });
+                    setFilters({});
+                    setCurrentPage(1);
+                } catch (error: any) {
+                    console.error("Import Excel Error inside reader:", error);
+                    toast({ title: t('Lỗi nhập dữ liệu'), description: error.message || t('Đã xảy ra lỗi khi đọc file.'), variant: 'destructive' });
+                } finally {
+                    setIsImporting(false);
+                    if (importExcelInputRef.current) importExcelInputRef.current.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } catch (error: any) {
+            console.error("Import Excel Error:", error);
+            setIsImporting(false);
+            if (importExcelInputRef.current) importExcelInputRef.current.value = '';
+        }
+    };
+
+    const handleDownloadTemplate = () => {
+        const templateData = [{
+            'Mã văn bản': 'CV-2026-001', 
+            'Số/ký hiệu': '01/QD-BGD', 
+            'Tiêu đề': 'Quyết định mẫu (Bắt buộc)', 
+            'Trích yếu': 'Nội dung trích yếu mẫu',
+            'Loại văn bản': 'Quyết định', 
+            'Ngày ban hành': '2026-05-12', 
+            'Ngày nhận': '2026-05-12',
+            'Cơ quan ban hành': 'Bộ Giáo dục', 
+            'Người ký': 'Nguyễn Văn A', 
+            'Phòng ban xử lý': 'Phòng Đào tạo',
+            'Người phụ trách': 'Trần Văn B', 
+            'Độ khẩn': 'Thường', 
+            'Độ mật': 'Thường', 
+            'Mật khẩu': '',
+            'Trạng thái': 'Mới',
+            'Đường dẫn file': 'https://link-toi-file-cua-ban.pdf'
+        }];
+        const ws = XLSX.utils.json_to_sheet(templateData); 
+        const wscols = [
+            {wch: 15}, {wch: 15}, {wch: 35}, {wch: 40}, 
+            {wch: 15}, {wch: 15}, {wch: 15}, 
+            {wch: 20}, {wch: 20}, {wch: 20},
+            {wch: 20}, {wch: 12}, {wch: 12}, {wch: 15}, {wch: 15}, {wch: 40}
+        ];
+
+        ws['!cols'] = wscols;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Template"); 
+        XLSX.writeFile(wb, `Template_NhapHoSo.xlsx`);
     };
 
     const columnDefs: any = { 
@@ -618,6 +725,13 @@ export default function DocumentRecordsPage() {
                     onChange={handleFileUpload}
                     accept=".pdf,.docx,.doc,.xlsx,.txt,.png,.jpg,.jpeg,.zip,.rar"
                 />
+                <input 
+                    type="file" 
+                    ref={importExcelInputRef} 
+                    className="hidden" 
+                    onChange={handleImportExcel}
+                    accept=".xlsx,.xls,.csv"
+                />
                 <div className="p-4 md:p-6">
                     {isOffline && (
                         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 text-amber-800 text-sm animate-in fade-in slide-in-from-top-2">
@@ -647,7 +761,29 @@ export default function DocumentRecordsPage() {
                                     )}
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
                                     {permissions.export && (
-                                        <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                        <>
+                                            <DropdownMenu>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="text-blue-600" disabled={isImporting}>
+                                                                {isImporting ? <Cog className="h-5 w-5 animate-spin" /> : <FileUp className="h-5 w-5" />}
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent><p>{t('Nhập dữ liệu hàng loạt')}</p></TooltipContent>
+                                                </Tooltip>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => importExcelInputRef.current?.click()}>
+                                                        <FileUp className="mr-2 h-4 w-4 text-blue-600" /> {t('Nhập từ file Excel')}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={handleDownloadTemplate}>
+                                                        <FileDown className="mr-2 h-4 w-4 text-green-600" /> {t('Tải file mẫu (Template)')}
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                            <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                        </>
                                     )}
                                     {permissions.add && (
                                         <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm hồ sơ mới')}</p></TooltipContent></Tooltip>
@@ -891,6 +1027,20 @@ export default function DocumentRecordsPage() {
                                                         </div>
                                                     ))}
                                                 </RadioGroup>
+                                                {['Mật', 'Tối mật'].includes(formData.confidentiality || '') && (
+                                                    <div className="mt-4 pt-4 border-t border-red-100 space-y-2 animate-in fade-in zoom-in duration-200">
+                                                        <Label className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1.5"><Shield className="h-3 w-3" /> Mật khẩu bảo vệ</Label>
+                                                        <Input 
+                                                            type="password" 
+                                                            value={formData.filePassword || ''} 
+                                                            onChange={e=>setFormData({...formData, filePassword: e.target.value})} 
+                                                            disabled={dialogMode==='view'} 
+                                                            placeholder="Nhập mật khẩu (tùy chọn)..." 
+                                                            className="h-9 border-red-200 bg-red-50 focus:border-red-500 focus:ring-red-500 text-xs text-red-700 placeholder:text-red-300" 
+                                                        />
+                                                        <p className="text-[9px] text-red-400 italic">User cần nhập mật khẩu này để xem hoặc tải file đính kèm.</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -932,7 +1082,24 @@ export default function DocumentRecordsPage() {
                                                             {isUploading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
                                                             {formData.originalFile ? "Thay đổi tệp tin" : "Chọn tệp từ máy"}
                                                         </Button>
-                                                        {formData.originalFile && <Button variant="ghost" className="text-blue-600 h-8" onClick={() => window.open(formData.originalFile, '_blank')}><Eye className="h-4 w-4 mr-2" /> Xem file/liên kết</Button>}
+                                                        {formData.originalFile && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                className="text-blue-600 h-8" 
+                                                                onClick={() => {
+                                                                    if (dialogMode === 'view' && ['Mật', 'Tối mật'].includes(formData.confidentiality || '') && formData.filePassword) {
+                                                                        const pwd = window.prompt("Tài liệu bảo mật. Vui lòng nhập mật khẩu:");
+                                                                        if (pwd !== formData.filePassword) {
+                                                                            alert("Mật khẩu không đúng!");
+                                                                            return;
+                                                                        }
+                                                                    }
+                                                                    window.open(formData.originalFile, '_blank');
+                                                                }}
+                                                            >
+                                                                <Eye className="h-4 w-4 mr-2" /> Xem file/liên kết
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
 

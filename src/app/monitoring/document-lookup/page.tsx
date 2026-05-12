@@ -101,6 +101,8 @@ export default function DocumentLookupPage() {
     const [selectedDoc, setSelectedDoc] = useState<DocumentRecord | null>(null);
     const [fullPreviewDoc, setFullPreviewDoc] = useState<DocumentRecord | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [passwordVerifiedDocs, setPasswordVerifiedDocs] = useState<Record<string, boolean>>({});
+    const [passwordInput, setPasswordInput] = useState('');
 
     const docRef = useMemo(() => (firestore ? collection(firestore, "document_records") : null), [firestore]);
     const { data: rawData, loading, error } = useCollection<DocumentRecord>(docRef);
@@ -580,25 +582,34 @@ export default function DocumentLookupPage() {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => setFullPreviewDoc(selectedDoc)}>
-                                                                <Maximize2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>Xem toàn màn hình</TooltipContent>
-                                                    </Tooltip>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
-                                                                <ExternalLink className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>Mở trong cửa sổ mới</TooltipContent>
-                                                    </Tooltip>
-                                                    <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
-                                                        <FileDown className="h-4 w-4" /> Tải về
-                                                    </Button>
+                                                    {(() => {
+                                                        const isConfidential = ['Mật', 'Tối mật'].includes((selectedDoc as any).confidentiality || '');
+                                                        const requiresPassword = isConfidential && (selectedDoc as any).filePassword && !passwordVerifiedDocs[selectedDoc.id || ''];
+                                                        if (requiresPassword) return null;
+                                                        return (
+                                                            <>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => setFullPreviewDoc(selectedDoc)}>
+                                                                            <Maximize2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>Xem toàn màn hình</TooltipContent>
+                                                                </Tooltip>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 bg-white text-slate-500 hover:text-primary" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
+                                                                            <ExternalLink className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>Mở trong cửa sổ mới</TooltipContent>
+                                                                </Tooltip>
+                                                                <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
+                                                                    <FileDown className="h-4 w-4" /> Tải về
+                                                                </Button>
+                                                            </>
+                                                        );
+                                                    })()}
                                                     <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400" onClick={() => setSelectedDoc(null)}>
                                                         <X className="h-5 w-5" />
                                                     </Button>
@@ -608,10 +619,64 @@ export default function DocumentLookupPage() {
                                             {/* PREVIEW CONTENT */}
                                             <div className="flex-1 bg-slate-100/50 p-6 flex flex-col overflow-hidden">
                                                 {selectedDoc.originalFile ? (() => {
+                                                    const isConfidential = ['Mật', 'Tối mật'].includes((selectedDoc as any).confidentiality || '');
+                                                    const requiresPassword = isConfidential && (selectedDoc as any).filePassword && !passwordVerifiedDocs[selectedDoc.id || ''];
+
+                                                    if (requiresPassword) {
+                                                        return (
+                                                            <div className="flex-1 bg-white rounded-xl shadow-lg border border-red-200 overflow-hidden flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
+                                                                <div className="h-24 w-24 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6 shadow-sm border border-red-100">
+                                                                    <Shield className="h-12 w-12" />
+                                                                </div>
+                                                                <h3 className="text-xl font-bold text-slate-800 mb-2">Tài liệu bảo mật</h3>
+                                                                <p className="text-sm text-slate-500 max-w-md mb-8">
+                                                                    Đây là tài liệu thuộc mức độ <b>{(selectedDoc as any).confidentiality}</b>. 
+                                                                    Vui lòng nhập mật khẩu được cung cấp để xem nội dung và tải về.
+                                                                </p>
+                                                                <div className="flex w-full max-w-sm items-center space-x-2">
+                                                                    <Input 
+                                                                        type="password" 
+                                                                        placeholder="Nhập mật khẩu truy cập..." 
+                                                                        value={passwordInput}
+                                                                        onChange={e => setPasswordInput(e.target.value)}
+                                                                        onKeyDown={e => {
+                                                                            if (e.key === 'Enter') {
+                                                                                if (passwordInput === (selectedDoc as any).filePassword) {
+                                                                                    setPasswordVerifiedDocs(prev => ({ ...prev, [selectedDoc.id || '']: true }));
+                                                                                    setPasswordInput('');
+                                                                                    toast({ title: "Xác thực thành công", description: "Đã mở khóa tài liệu." });
+                                                                                } else {
+                                                                                    toast({ title: "Sai mật khẩu", variant: "destructive" });
+                                                                                }
+                                                                            }
+                                                                        }}
+                                                                        className="h-11 border-red-200 focus:ring-red-500 text-center tracking-widest text-lg"
+                                                                    />
+                                                                    <Button 
+                                                                        className="h-11 px-6 bg-red-600 hover:bg-red-700 text-white font-bold"
+                                                                        onClick={() => {
+                                                                            if (passwordInput === (selectedDoc as any).filePassword) {
+                                                                                setPasswordVerifiedDocs(prev => ({ ...prev, [selectedDoc.id || '']: true }));
+                                                                                setPasswordInput('');
+                                                                                toast({ title: "Xác thực thành công", description: "Đã mở khóa tài liệu." });
+                                                                            } else {
+                                                                                toast({ title: "Sai mật khẩu", variant: "destructive" });
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Mở khóa
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
                                                     const url = selectedDoc.originalFile;
                                                     const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
                                                     const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '');
                                                     const isPdf = ext === 'pdf';
+                                                    const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext || '');
+                                                    const isGoogleViewable = ['txt', 'csv'].includes(ext || '');
 
                                                     return (
                                                         <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
@@ -623,6 +688,10 @@ export default function DocumentLookupPage() {
                                                                 </ScrollArea>
                                                             ) : isPdf ? (
                                                                 <iframe src={`${url}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
+                                                            ) : isOffice ? (
+                                                                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`} className="w-full h-full border-none" title="Office Preview" />
+                                                            ) : isGoogleViewable || url.includes('firebasestorage.googleapis.com') ? (
+                                                                <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="w-full h-full border-none" title="Google Preview" />
                                                             ) : (
                                                                 <ScrollArea className="w-full h-full">
                                                                     <div className="flex flex-col items-center gap-6 p-12 pt-[10vh] pb-24 text-center">
@@ -698,9 +767,16 @@ export default function DocumentLookupPage() {
                                         <h3 className="text-sm font-bold text-slate-800 truncate">{fullPreviewDoc.title}</h3>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Button variant="outline" size="sm" className="h-8 px-3 text-[11px] font-bold gap-2" onClick={() => window.open(fullPreviewDoc.originalFile, '_blank')}>
-                                            <ExternalLink className="h-3.5 w-3.5" /> Mở tab mới
-                                        </Button>
+                                        {(() => {
+                                            const isConfidential = ['Mật', 'Tối mật'].includes((fullPreviewDoc as any).confidentiality || '');
+                                            const requiresPassword = isConfidential && (fullPreviewDoc as any).filePassword && !passwordVerifiedDocs[fullPreviewDoc.id || ''];
+                                            if (requiresPassword) return null;
+                                            return (
+                                                <Button variant="outline" size="sm" className="h-8 px-3 text-[11px] font-bold gap-2" onClick={() => window.open(fullPreviewDoc.originalFile, '_blank')}>
+                                                    <ExternalLink className="h-3.5 w-3.5" /> Mở tab mới
+                                                </Button>
+                                            );
+                                        })()}
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFullPreviewDoc(null)}>
                                             <X className="h-4 w-4" />
                                         </Button>
@@ -709,17 +785,37 @@ export default function DocumentLookupPage() {
                                 <div className="flex-1 bg-slate-100 p-4 overflow-hidden">
                                     <div className="w-full h-full bg-white rounded-lg shadow-inner overflow-hidden border border-slate-200">
                                         {(() => {
+                                            const isConfidential = ['Mật', 'Tối mật'].includes((fullPreviewDoc as any).confidentiality || '');
+                                            const requiresPassword = isConfidential && (fullPreviewDoc as any).filePassword && !passwordVerifiedDocs[fullPreviewDoc.id || ''];
+
+                                            if (requiresPassword) {
+                                                return (
+                                                    <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-white">
+                                                        <div className="h-24 w-24 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6">
+                                                            <Shield className="h-12 w-12" />
+                                                        </div>
+                                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Tài liệu bảo mật</h3>
+                                                        <p className="text-sm text-slate-500 max-w-md mb-8">Bạn cần mở khóa tài liệu này ở màn hình xem trước trước khi có thể xem toàn màn hình.</p>
+                                                        <Button onClick={() => setFullPreviewDoc(null)}>Đóng và quay lại</Button>
+                                                    </div>
+                                                );
+                                            }
+
                                             const url = fullPreviewDoc.originalFile || '';
                                             const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
                                             const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '');
                                             const isPdf = ext === 'pdf';
+                                            const isOffice = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext || '');
+                                            const isGoogleViewable = ['txt', 'csv'].includes(ext || '');
 
                                             if (isImage) {
                                                 return <ScrollArea className="w-full h-full"><div className="p-4 flex justify-center"><img src={url} alt="Preview" className="max-w-full h-auto shadow-sm rounded border" /></div></ScrollArea>;
                                             } else if (isPdf) {
                                                 return <iframe src={`${url}#toolbar=1`} className="w-full h-full border-none" title="PDF Preview" />;
-                                            } else if (url.includes('firebasestorage.googleapis.com')) {
-                                                return <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="w-full h-full border-none" title="Doc Preview" />;
+                                            } else if (isOffice) {
+                                                return <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`} className="w-full h-full border-none" title="Office Preview" />;
+                                            } else if (isGoogleViewable || url.includes('firebasestorage.googleapis.com')) {
+                                                return <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="w-full h-full border-none" title="Google Preview" />;
                                             }
                                             return (
                                                 <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-white">

@@ -3,12 +3,8 @@ import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
-const getDb = async () => {
-    const apps = getApps();
-    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    return db;
-};
+import { db } from '@/lib/firebase';
+const getDb = async () => db;
 
 // Xử lý Preflight request (CORS)
 export async function OPTIONS() {
