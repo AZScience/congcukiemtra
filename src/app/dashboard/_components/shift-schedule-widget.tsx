@@ -207,9 +207,9 @@ export default function ShiftScheduleWidget() {
     const updater = scheduleData ? employees.find(e => e.id === scheduleData.updatedBy) : null;
 
     return (
-        <Card className="w-full shadow-md border-blue-200 dark:border-blue-800 transition-all duration-300">
+        <Card className="w-full shadow-md border-blue-200 dark:border-blue-800 transition-all duration-300 overflow-hidden">
             <CardHeader 
-                className="py-3 flex flex-row items-center justify-between border-b bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors"
+                className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center gap-2">
@@ -219,9 +219,9 @@ export default function ShiftScheduleWidget() {
                         {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                     </CardTitle>
                 </div>
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end" onClick={(e) => e.stopPropagation()}>
                     {scheduleData && scheduleData.url && (
-                        <div className="text-xs text-muted-foreground mr-2 hidden sm:block">
+                        <div className="text-xs text-muted-foreground mr-2 hidden sm:block w-full sm:w-auto text-right sm:text-left mb-2 sm:mb-0">
                             Cập nhật: {formatTimeAgo(scheduleData.updatedAt)} {updater ? `bởi ${updater.name}` : ''}
                         </div>
                     )}
@@ -235,17 +235,17 @@ export default function ShiftScheduleWidget() {
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="h-8 shadow-sm"
+                        className="h-8 shadow-sm shrink-0"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                     >
-                        {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                        {isUploading ? t('Đang tải...') : (scheduleData?.url ? t('Cập nhật lịch mới') : t('Tải lên lịch trực'))}
+                        {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin shrink-0" /> : <Upload className="h-4 w-4 mr-2 shrink-0" />}
+                        {isUploading ? t('Đang tải...') : (scheduleData?.url ? t('Cập nhật') : t('Tải lên lịch'))}
                     </Button>
                     {scheduleData && scheduleData.url && (
-                        <Button size="sm" variant="default" asChild className="h-8">
+                        <Button size="sm" variant="default" asChild className="h-8 shrink-0">
                             <a href={scheduleData.url} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4 mr-2" />
+                                <Download className="h-4 w-4 mr-2 shrink-0" />
                                 {t('Tải về')}
                             </a>
                         </Button>

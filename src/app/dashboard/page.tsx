@@ -27,13 +27,13 @@ export default function DashboardPage() {
             <div className="p-4 md:p-6 space-y-6">
                 <TodayBirthdays />
                 
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
-                    <div className="lg:col-span-8 space-y-6">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12 w-full min-w-0">
+                    <div className="lg:col-span-8 space-y-6 min-w-0 w-full">
                         <DailyActivitySummary />
                         <ScheduleViewer />
                         <ShiftScheduleWidget />
                     </div>
-                    <div className="lg:col-span-4 space-y-6">
+                    <div className="lg:col-span-4 space-y-6 min-w-0 w-full">
                         <UserEngagement />
                         <RecentActivity />
                     </div>

@@ -315,7 +315,7 @@ export default function ScheduleViewer() {
     const orderedColumns = allColumns.filter(key => columnVisibility[key]);
 
     return (
-        <Card className="shadow-md">
+        <Card className="shadow-md overflow-hidden">
             <CardHeader className="py-3 border-b">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -419,11 +419,11 @@ export default function ScheduleViewer() {
                     </Table>
                 </div>
             </CardContent>
-            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
-                <div className="text-sm text-muted-foreground">Tổng cộng {sortedItems.length} bản ghi. {selectedSet.size > 0 && `Đã chọn ${selectedSet.size} dòng.`}</div>
-                <div className="flex items-center gap-4">
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t w-full overflow-hidden">
+                <div className="text-sm text-muted-foreground text-center sm:text-left">Tổng cộng {sortedItems.length} bản ghi. {selectedSet.size > 0 && `Đã chọn ${selectedSet.size} dòng.`}</div>
+                <div className="flex flex-wrap items-center justify-center gap-4 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
-                        <p className="text-sm text-muted-foreground">Số dòng</p>
+                        <p className="text-sm text-muted-foreground shrink-0">Số dòng</p>
                         <Select value={`${safeRowsPerPage}`} onValueChange={(v) => { setRowsPerPage(Number(v)); setCurrentPage(1); }}>
                             <SelectTrigger className="h-8 w-[70px]"><SelectValue placeholder={safeRowsPerPage} /></SelectTrigger>
                             <SelectContent side="top">
@@ -431,12 +431,12 @@ export default function ScheduleViewer() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(1)} disabled={safeCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
-                        <div className="flex items-center gap-1 font-medium text-sm"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value, 10); if (p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronRight className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" className="h-8 w-8 p-0" onClick={() => setCurrentPage(totalPages)} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronsRight className="h-4 w-4" /></Button>
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(1)} disabled={safeCurrentPage === 1}><ChevronsLeft className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={safeCurrentPage === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                        <div className="flex items-center gap-1 font-medium text-sm shrink-0"><Input type="number" className="h-8 w-12 text-center" value={safeCurrentPage} onChange={e => { const p = parseInt(e.target.value, 10); if (p > 0 && p <= totalPages) setCurrentPage(p); }} />/ {totalPages}</div>
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronRight className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" className="h-8 w-8 p-0 shrink-0" onClick={() => setCurrentPage(totalPages)} disabled={safeCurrentPage === totalPages || totalPages === 0}><ChevronsRight className="h-4 w-4" /></Button>
                     </div>
                 </div>
             </CardFooter>
