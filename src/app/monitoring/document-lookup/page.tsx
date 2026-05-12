@@ -257,16 +257,34 @@ export default function DocumentLookupPage() {
 
             // General Keyword Search based on scopes
             if (searchTermLower) {
+                const getScopeValue = (item: DocumentRecord, scope: string) => {
+                    if (scope === 'originalFile' && item.originalFile) {
+                        try {
+                            const url = item.originalFile;
+                            if (url.includes('firebasestorage.googleapis.com')) {
+                                const urlObj = new URL(url);
+                                const pathParts = urlObj.pathname.split('/');
+                                const encodedName = pathParts[pathParts.length - 1];
+                                return (decodeURIComponent(encodedName).split('/').pop() || '').toLowerCase();
+                            } else if (url.startsWith('http')) {
+                                const parts = url.split('/');
+                                return (parts[parts.length - 1] || url).toLowerCase();
+                            }
+                        } catch (e) {}
+                    }
+                    return String(item[scope as keyof DocumentRecord] || '').toLowerCase();
+                };
+
                 if (searchTermLower.includes('|')) {
                     const parts = searchTermLower.split('|').map(p => p.trim());
-                    const orderedPossibleScopes = ['docNumber', 'title', 'abstract', 'extractedText', 'signer', 'issuingBody'];
+                    const orderedPossibleScopes = ['docNumber', 'title', 'abstract', 'extractedText', 'signer', 'issuingBody', 'originalFile'];
                     const activeOrderedScopes = orderedPossibleScopes.filter(s => searchScopes.includes(s));
                     
                     const checkPart = (scope: string, index: number) => {
                         const part = parts[index];
                         if (!part) return searchLogic === 'and';
                         
-                        const value = String(item[scope as keyof DocumentRecord] || '').toLowerCase();
+                        const value = getScopeValue(item, scope);
                         if (searchMode === 'exact') return value === part;
                         return value.includes(part);
                     };
@@ -278,7 +296,7 @@ export default function DocumentLookupPage() {
                     if (!isMatch) return false;
                 } else {
                     const matchesAnyScope = searchScopes.some(scope => {
-                        const value = String(item[scope as keyof DocumentRecord] || '').toLowerCase();
+                        const value = getScopeValue(item, scope);
                         if (searchMode === 'exact') return value === searchTermLower;
                         return value.includes(searchTermLower);
                     });
@@ -508,6 +526,10 @@ export default function DocumentLookupPage() {
                                     <div className="flex items-center space-x-2">
                                         <Checkbox id="scope-body" checked={searchScopes.includes('issuingBody')} onCheckedChange={(checked) => setSearchScopes(prev => checked ? [...prev, 'issuingBody'] : prev.filter(s => s !== 'issuingBody'))} />
                                         <Label htmlFor="scope-body" className="text-sm font-medium text-slate-600 cursor-pointer">Cơ quan ban hành</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox id="scope-file" checked={searchScopes.includes('originalFile')} onCheckedChange={(checked) => setSearchScopes(prev => checked ? [...prev, 'originalFile'] : prev.filter(s => s !== 'originalFile'))} />
+                                        <Label htmlFor="scope-file" className="text-sm font-medium text-slate-600 cursor-pointer">Tên file văn bản</Label>
                                     </div>
                                 </div>
                             </CardContent>
