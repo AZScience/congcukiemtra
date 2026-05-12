@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -103,6 +103,14 @@ export default function DocumentLookupPage() {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [passwordVerifiedDocs, setPasswordVerifiedDocs] = useState<Record<string, boolean>>({});
     const [passwordInput, setPasswordInput] = useState('');
+    const [isMobile, setIsMobile] = useState(false);
+
+    React.useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const docRef = useMemo(() => (firestore ? collection(firestore, "document_records") : null), [firestore]);
     const { data: rawData, loading, error } = useCollection<DocumentRecord>(docRef);
@@ -187,6 +195,36 @@ export default function DocumentLookupPage() {
     }, [firestore, authUser]);
 
     React.useEffect(() => { if (authUser) loadPresets(); }, [loadPresets, authUser]);
+
+    // Resizable Left Panel State
+    const [leftPanelWidth, setLeftPanelWidth] = useState(350);
+    const isResizing = useRef(false);
+
+    const startResizing = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        isResizing.current = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            if (!isResizing.current) return;
+            setLeftPanelWidth(prev => {
+                const newWidth = prev + moveEvent.movementX;
+                return Math.max(250, Math.min(newWidth, 800));
+            });
+        };
+        
+        const handleMouseUp = () => {
+            isResizing.current = false;
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, []);
 
     const handleSearch = useCallback(() => {
         setFilters(prev => ({ ...prev, title: searchTerm }));
@@ -413,12 +451,12 @@ export default function DocumentLookupPage() {
 
                                 <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-1">
                                     {/* Search Mode Select */}
-                                    <div className="flex items-center gap-3 mr-4 pr-6 border-r border-slate-200">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mr-0 sm:mr-4 pr-0 sm:pr-6 border-none sm:border-r border-slate-200 w-full sm:w-auto">
                                         <Select 
                                             value={searchMode} 
                                             onValueChange={(v: any) => setSearchMode(v)}
                                         >
-                                            <SelectTrigger className="h-8 w-36 bg-white border-slate-200 text-xs font-bold text-slate-600">
+                                            <SelectTrigger className="h-8 w-full sm:w-36 bg-white border-slate-200 text-xs font-bold text-slate-600">
                                                 <div className="flex items-center gap-2">
                                                     <Filter className="h-3.5 w-3.5 text-primary" />
                                                     <SelectValue />
@@ -434,7 +472,7 @@ export default function DocumentLookupPage() {
                                             value={searchLogic} 
                                             onValueChange={(v: any) => setSearchLogic(v)}
                                         >
-                                            <SelectTrigger className="h-8 w-56 bg-white border-slate-200 text-xs font-bold text-slate-600">
+                                            <SelectTrigger className="h-8 w-full sm:w-56 bg-white border-slate-200 text-xs font-bold text-slate-600">
                                                 <div className="flex items-center gap-2">
                                                     <ArrowUpDown className="h-3.5 w-3.5 text-primary" />
                                                     <SelectValue />
@@ -477,22 +515,32 @@ export default function DocumentLookupPage() {
 
                         {/* SPLIT VIEW CONTAINER */}
                         {(searchTerm || selectedDocTypes.length > 0 || selectedDate) && (
-                            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 h-[750px] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex flex-col md:flex-row h-[85vh] min-h-[600px] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
                                 {/* LEFT: RESULTS LIST */}
-                                <div className="w-full md:w-[450px] flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                <div 
+                                    className={cn("w-full flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm h-full shrink-0", selectedDoc ? "hidden md:flex" : "flex")}
+                                    style={{ width: isMobile ? '100%' : `${leftPanelWidth}px` }}
+                                >
                                     <div className="px-4 py-3 bg-slate-50/50 border-b flex items-center justify-between shrink-0">
                                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Danh sách kết quả ({sortedItems.length})</span>
-                                        <Select value={String(rowsPerPage)} onValueChange={v => {setRowsPerPage(Number(v)); setCurrentPage(1);}}>
-                                            <SelectTrigger className="h-7 w-20 text-[10px] bg-white border-slate-200"><SelectValue /></SelectTrigger>
-                                            <SelectContent><SelectItem value="5">5 dòng</SelectItem><SelectItem value="10">10 dòng</SelectItem><SelectItem value="20">20 dòng</SelectItem><SelectItem value="50">50 dòng</SelectItem></SelectContent>
-                                        </Select>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-slate-500 font-medium">Số dòng</span>
+                                            <Select value={String(rowsPerPage)} onValueChange={v => {setRowsPerPage(Number(v)); setCurrentPage(1);}}>
+                                                <SelectTrigger className="h-7 w-[60px] text-[10px] bg-white border-slate-200"><SelectValue /></SelectTrigger>
+                                                <SelectContent align="end">
+                                                    {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => (
+                                                        <SelectItem key={v} value={String(v)} className="text-[10px]">{v}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
 
                                     <ScrollArea className="flex-1">
-                                        <div className="divide-y divide-slate-100">
+                                        <div className="divide-y divide-slate-100 min-w-max">
                                             {loading ? (
                                                 Array(5).fill(0).map((_, i) => (
-                                                    <div key={i} className="p-4 space-y-3"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+                                                    <div key={i} className="p-4 space-y-3 min-w-[400px]"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
                                                 ))
                                             ) : paginatedItems.length > 0 ? (
                                                 paginatedItems.map((item) => {
@@ -514,10 +562,10 @@ export default function DocumentLookupPage() {
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <h4 className={cn("text-sm font-bold truncate", isActive ? "text-primary" : "text-slate-800")}>{fileInfo.name}</h4>
-                                                                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{item.title}</p>
-                                                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 font-medium">
+                                                                <div className="flex-1 min-w-0 pr-4">
+                                                                    <h4 className={cn("text-sm font-bold whitespace-nowrap", isActive ? "text-primary" : "text-slate-800")}>{fileInfo.name}</h4>
+                                                                    <p className="text-[11px] text-slate-500 whitespace-nowrap mt-0.5">{item.title}</p>
+                                                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 font-medium whitespace-nowrap">
                                                                         <span className="flex items-center gap-1"><Hash className="h-3 w-3" /> {item.docNumber || 'N/A'}</span>
                                                                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {item.issueDate ? format(new Date(item.issueDate), 'dd/MM/yyyy') : '---'}</span>
                                                                         <Badge variant="outline" className="px-1 py-0 h-3.5 text-[9px] bg-slate-50 text-slate-400 border-slate-200">{item.docType}</Badge>
@@ -536,6 +584,7 @@ export default function DocumentLookupPage() {
                                                 </div>
                                             )}
                                         </div>
+                                        <ScrollBar orientation="horizontal" />
                                     </ScrollArea>
                                     {/* PAGINATION FOOTER (LEFT PANEL) */}
                                     <div className="p-3 border-t bg-slate-50/50 flex items-center justify-between gap-2 shrink-0">
@@ -551,13 +600,24 @@ export default function DocumentLookupPage() {
                                     </div>
                                 </div>
 
+                                {/* DRAG RESIZER */}
+                                <div 
+                                    className="hidden md:flex w-6 shrink-0 cursor-col-resize items-center justify-center group"
+                                    onMouseDown={startResizing}
+                                >
+                                    <div className="w-1 h-12 bg-slate-200 rounded-full group-hover:bg-primary/50 transition-colors" />
+                                </div>
+
                                 {/* RIGHT: DOCUMENT PREVIEW (Finder Style) */}
-                                <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm relative">
+                                <div className={cn("flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm h-full", selectedDoc ? "flex" : "hidden md:flex")}>
                                     {selectedDoc ? (
-                                        <div className="flex-1 flex flex-col">
+                                        <div className="flex-1 flex flex-col h-full overflow-hidden">
                                             {/* PREVIEW HEADER */}
-                                            <div className="px-6 py-4 border-b flex items-center justify-between bg-slate-50/30 shrink-0">
-                                                <div className="flex items-center gap-4 min-w-0">
+                                            <div className="px-4 md:px-6 py-4 border-b flex items-center justify-between bg-slate-50/30 shrink-0">
+                                                <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                                                    <Button variant="ghost" size="icon" className="md:hidden shrink-0 mr-1" onClick={() => setSelectedDoc(null)}>
+                                                        <ChevronLeft className="h-5 w-5" />
+                                                    </Button>
                                                     {(() => {
                                                         const info = getFileInfo(selectedDoc.originalFile || '');
                                                         const I = info.icon;
@@ -574,10 +634,10 @@ export default function DocumentLookupPage() {
                                                     })()}
                                                     <div className="min-w-0">
                                                         <h3 className="text-base font-bold text-slate-800 truncate leading-tight" title={selectedDoc.title}>{selectedDoc.title}</h3>
-                                                        <div className="flex items-center gap-4 mt-1">
-                                                            <span className="text-xs text-slate-500 font-medium">{selectedDoc.issuingBody}</span>
-                                                            <span className="text-[10px] text-slate-300">|</span>
-                                                            <span className="text-xs text-slate-500 font-medium">Ký bởi: {selectedDoc.signer}</span>
+                                                        <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-1">
+                                                            <span className="text-xs text-slate-500 font-medium truncate max-w-[120px] md:max-w-none">{selectedDoc.issuingBody}</span>
+                                                            <span className="text-[10px] text-slate-300 hidden md:inline">|</span>
+                                                            <span className="text-xs text-slate-500 font-medium truncate max-w-[120px] md:max-w-none">Ký bởi: {selectedDoc.signer}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -604,8 +664,8 @@ export default function DocumentLookupPage() {
                                                                     </TooltipTrigger>
                                                                     <TooltipContent>Mở trong cửa sổ mới</TooltipContent>
                                                                 </Tooltip>
-                                                                <Button variant="outline" size="sm" className="h-9 px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
-                                                                    <FileDown className="h-4 w-4" /> Tải về
+                                                                <Button variant="outline" size="sm" className="h-9 px-3 md:px-4 text-xs font-bold gap-2 border-slate-200 bg-white" onClick={() => window.open(selectedDoc.originalFile, '_blank')}>
+                                                                    <FileDown className="h-4 w-4" /> <span className="hidden md:inline">Tải về</span>
                                                                 </Button>
                                                             </>
                                                         );
@@ -679,21 +739,25 @@ export default function DocumentLookupPage() {
                                                     const isGoogleViewable = ['txt', 'csv'].includes(ext || '');
 
                                                     return (
-                                                        <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                                                        <div className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
                                                             {isImage ? (
-                                                                <ScrollArea className="w-full h-full">
+                                                                <ScrollArea className="flex-1 w-full">
                                                                     <div className="p-8 flex justify-center">
                                                                         <img src={url} alt="Preview" className="max-w-full shadow-2xl rounded" />
                                                                     </div>
                                                                 </ScrollArea>
                                                             ) : isPdf ? (
-                                                                <iframe src={`${url}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
+                                                                isMobile ? (
+                                                                    <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="flex-1 w-full border-none" title="Google Preview PDF" />
+                                                                ) : (
+                                                                    <iframe src={`${url}#toolbar=0`} className="flex-1 w-full border-none" title="PDF Preview" />
+                                                                )
                                                             ) : isOffice ? (
-                                                                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`} className="w-full h-full border-none" title="Office Preview" />
+                                                                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`} className="flex-1 w-full border-none" title="Office Preview" />
                                                             ) : isGoogleViewable || url.includes('firebasestorage.googleapis.com') ? (
-                                                                <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="w-full h-full border-none" title="Google Preview" />
+                                                                <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`} className="flex-1 w-full border-none" title="Google Preview" />
                                                             ) : (
-                                                                <ScrollArea className="w-full h-full">
+                                                                <ScrollArea className="flex-1 w-full">
                                                                     <div className="flex flex-col items-center gap-6 p-12 pt-[10vh] pb-24 text-center">
                                                                         <div className="h-24 w-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 shrink-0">
                                                                             <LinkIcon className="h-12 w-12" />
