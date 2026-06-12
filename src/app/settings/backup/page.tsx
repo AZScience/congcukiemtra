@@ -54,9 +54,17 @@ export default function BackupRestorePage() {
             
             for (const collName of COLLECTIONS) {
                 console.log(`Đang sao lưu: ${collName}...`);
-                const querySnapshot = await getDocs(collection(firestore, collName));
+                
+                // Add a 10s timeout to prevent infinite hanging when Firebase is offline/quota exceeded
+                const fetchPromise = getDocs(collection(firestore, collName));
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Yêu cầu hết thời gian chờ. Có thể do mạng hoặc Google khóa truy cập (Quota Exceeded).')), 10000)
+                );
+                
+                const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
                 const docs: Record<string, any> = {};
-                querySnapshot.forEach((docSnap) => {
+                querySnapshot.forEach((docSnap: any) => {
                     docs[docSnap.id] = docSnap.data();
                 });
                 if (Object.keys(docs).length > 0) {
