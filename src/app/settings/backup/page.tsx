@@ -27,7 +27,7 @@ export default function BackupRestorePage() {
     const [serverFiles, setServerFiles] = useState<{name: string, size: number, createdAt: string}[]>([]);
     const { toast } = useToast();
 
-    useEffect(() => {
+    const fetchServerFiles = () => {
         fetch('/api/backup-list')
             .then(res => res.json())
             .then(data => {
@@ -36,6 +36,10 @@ export default function BackupRestorePage() {
                 }
             })
             .catch(err => console.error("Error fetching backup list:", err));
+    };
+
+    useEffect(() => {
+        fetchServerFiles();
     }, []);
 
     const handleExport = async () => {
