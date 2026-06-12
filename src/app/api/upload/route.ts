@@ -4,6 +4,10 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 
 export async function POST(request: Request) {
+  if (process.env.VERCEL === '1') {
+    return NextResponse.json({ success: false, error: 'Vercel không hỗ trợ lưu trữ file cục bộ' }, { status: 400 });
+  }
+
   try {
     const data = await request.formData();
     const file: File | null = data.get('file') as unknown as File;
