@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { db as firestore } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
-import { Download, Loader2, FileJson, History, Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { Download, Loader2, FileJson, History, Trash2, Upload } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 const COLLECTIONS = [
     'schedules', 'activity-logs', 'messages', 'discussion_sections', 
@@ -26,6 +26,7 @@ export default function BackupRestorePage() {
     const [deletingFile, setDeletingFile] = useState<string | null>(null);
     const [serverFiles, setServerFiles] = useState<{name: string, size: number, createdAt: string}[]>([]);
     const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const fetchServerFiles = () => {
         fetch('/api/backup-list')
@@ -168,38 +169,7 @@ export default function BackupRestorePage() {
                 backupData = await response.json();
             }
             
-            let batch = writeBatch(firestore);
-            let operationCount = 0;
-            let totalOperations = 0;
-            
-            let totalToRestore = 0;
-            for (const docs of Object.values(backupData)) {
-                totalToRestore += Object.keys(docs as object).length;
-            }
-
-            for (const [collName, docs] of Object.entries(backupData)) {
-                const docRecords = docs as Record<string, any>;
-                for (const [docId, docData] of Object.entries(docRecords)) {
-                    const docRef = doc(firestore, collName, docId);
-                    batch.set(docRef, docData);
-                    operationCount++;
-                    totalOperations++;
-
-                    if (operationCount >= 400) {
-                        await batch.commit();
-                        batch = writeBatch(firestore);
-                        operationCount = 0;
-                        const pct = Math.round((totalOperations / totalToRestore) * 100);
-                        setImportProgress(`${pct}%`);
-                    }
-                }
-            }
-
-            if (operationCount > 0) {
-                await batch.commit();
-            }
-
-            toast({ title: "Thành công", description: `Đã phục hồi ${totalOperations} bản ghi dữ liệu.` });
+            await executeRestore(backupData);
             
         } catch (error: any) {
             console.error(error);
@@ -213,6 +183,80 @@ export default function BackupRestorePage() {
             setImportProgress('');
         }
     };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setImportingFile('Tải từ máy tính...');
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const jsonContent = event.target?.result as string;
+                const backupData = JSON.parse(jsonContent);
+                await executeRestore(backupData);
+            } catch (error: any) {
+                console.error(error);
+                toast({ 
+                    title: "Lỗi phục hồi", 
+                    description: "File backup không hợp lệ hoặc " + (error.message?.includes('Quota') ? 'Google đã khóa truy cập (Quota Exceeded).' : error.message), 
+                    variant: "destructive" 
+                });
+            } finally {
+                setImportingFile(null);
+                setImportProgress('');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        };
+        reader.onerror = () => {
+            toast({ title: "Lỗi", description: "Không thể đọc file", variant: "destructive" });
+            setImportingFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+        reader.readAsText(file);
+    };
+
+    const executeRestore = async (backupData: any) => {
+        let batch = writeBatch(firestore);
+        let operationCount = 0;
+        let totalOperations = 0;
+        
+        let totalToRestore = 0;
+        for (const docs of Object.values(backupData)) {
+            totalToRestore += Object.keys(docs as object).length;
+        }
+
+        for (const [collName, docs] of Object.entries(backupData)) {
+            const docRecords = docs as Record<string, any>;
+            for (const [docId, docData] of Object.entries(docRecords)) {
+                const docRef = doc(firestore, collName, docId);
+                batch.set(docRef, docData);
+                operationCount++;
+                totalOperations++;
+
+                if (operationCount >= 400) {
+                    const commitPromise = batch.commit();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Quota Exceeded hoặc mất mạng')), 15000));
+                    await Promise.race([commitPromise, timeoutPromise]);
+                    
+                    batch = writeBatch(firestore);
+                    operationCount = 0;
+                    const pct = Math.round((totalOperations / totalToRestore) * 100);
+                    setImportProgress(`${pct}%`);
+                }
+            }
+        }
+
+        if (operationCount > 0) {
+            const commitPromise = batch.commit();
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Quota Exceeded hoặc mất mạng')), 15000));
+            await Promise.race([commitPromise, timeoutPromise]);
+        }
+
+        toast({ title: "Thành công", description: `Đã phục hồi ${totalOperations} bản ghi dữ liệu.` });
+    };
+            
+
 
     return (
         <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -239,6 +283,25 @@ export default function BackupRestorePage() {
                         >
                             {isExporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Đang xử lý...</> : 'Tải Bản Sao Lưu Về Máy'}
                         </Button>
+
+                        <div className="mt-6 pt-6 border-t">
+                            <h3 className="text-sm font-medium mb-3 flex items-center gap-2"><Upload className="w-4 h-4" /> Phục hồi từ máy tính</h3>
+                            <input 
+                                type="file" 
+                                accept=".json" 
+                                className="hidden" 
+                                ref={fileInputRef}
+                                onChange={handleFileUpload}
+                            />
+                            <Button 
+                                variant="outline" 
+                                className="w-full" 
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={importingFile !== null}
+                            >
+                                {importingFile === 'Tải từ máy tính...' ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Đang nạp {importProgress}</> : 'Chọn file backup (.json)'}
+                            </Button>
+                        </div>
 
                         {serverFiles.length > 0 && (
                             <div className="mt-6 pt-6 border-t">
