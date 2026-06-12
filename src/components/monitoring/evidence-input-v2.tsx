@@ -199,6 +199,53 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
 
     console.log("Starting blob upload:", fileName);
     
+    // --- 0. USE BASE64 FOR IMAGES (BYPASS STORAGE ON VERCEL) ---
+    if (blob.type.startsWith('image/')) {
+      try {
+        console.log("Compressing image to base64...");
+        const base64Url = await new Promise<string>((resolve, reject) => {
+          const img = new Image();
+          const objectUrl = URL.createObjectURL(blob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 1000;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height *= MAX_SIZE / width;
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width *= MAX_SIZE / height;
+                height = MAX_SIZE;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(objectUrl);
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+          };
+          img.onerror = reject;
+          img.src = objectUrl;
+        });
+        
+        // Return directly if base64 size is reasonable (Firestore max doc size is 1MB)
+        if (base64Url.length < 800000) {
+           console.log("Using Base64 directly (Size:", Math.round(base64Url.length / 1024), "KB)");
+           return base64Url;
+        } else {
+           console.log("Base64 too large, falling back to storage upload");
+        }
+      } catch (e) {
+        console.warn("Base64 compression failed, falling back...", e);
+      }
+    }
+
     // --- 1. TRY CLIENT-SIDE UPLOAD FIRST ---
     try {
       console.log("Attempting client-side upload...");
