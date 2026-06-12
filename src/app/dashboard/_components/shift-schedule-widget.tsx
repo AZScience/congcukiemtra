@@ -191,8 +191,7 @@ export default function ShiftScheduleWidget() {
                         console.log("ShiftSchedule: Firebase upload successful.");
                         downloadUrl = url;
                     } catch (fbErr: any) {
-                        console.error("ShiftSchedule: Firebase upload failed:", fbErr.message);
-                        throw new Error("Lỗi tải PDF. Hệ thống chưa kích hoạt Firebase Storage (Vui lòng chọn ảnh chụp màn hình thay vì file PDF, hoặc bật Storage trong Firebase Console).");
+                        console.warn("ShiftSchedule: Firebase client upload failed, falling back...", fbErr.message);
                     }
             }
 
