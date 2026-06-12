@@ -500,6 +500,37 @@ export default function DocumentRecordsPage() {
                 }
             }
 
+            // --- 0.5. TRY BASE64 FOR SMALL PDFS (BYPASS STORAGE ON VERCEL) ---
+            if (!url && file.type === 'application/pdf' && file.size < 700000) {
+                try {
+                    console.log("Converting small PDF to base64...");
+                    const base64Url = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    
+                    if (base64Url.length < 900000) {
+                        url = base64Url;
+                        console.log("PDF Base64 conversion successful.");
+                        
+                        setFormData(prev => ({ ...prev, originalFile: url }));
+                        toast({ title: t("Tải lên thành công"), description: file.name });
+                        triggerAIExtraction(file.name);
+                        
+                        setIsUploading(false);
+                        setUploadProgress(0);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return; // Exit early since upload succeeded
+                    } else {
+                        console.log("PDF Base64 too large, falling back to storage upload.");
+                    }
+                } catch (e) {
+                    console.warn("PDF Base64 conversion failed, falling back...", e);
+                }
+            }
+
             // --- 1. TRY CLIENT-SIDE UPLOAD (with timeout) ---
             try {
                 console.log("Attempting client-side Firebase upload...");

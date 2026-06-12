@@ -79,8 +79,8 @@ export default function ShiftScheduleWidget() {
         const file = e.target.files?.[0];
         if (!file || !firestore || !storage || !user) return;
         
-        if (file.type !== 'application/pdf') {
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Chỉ hỗ trợ file PDF.') });
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Chỉ hỗ trợ file ảnh hoặc PDF.') });
             return;
         }
 
@@ -155,6 +155,28 @@ export default function ShiftScheduleWidget() {
                     }
                 } catch (e) {
                     console.warn("ShiftSchedule: Base64 compression failed, falling back...", e);
+                }
+            }
+
+            // --- 0.5. TRY BASE64 FOR SMALL PDFS (BYPASS STORAGE ON VERCEL) ---
+            if (!downloadUrl && file.type === 'application/pdf' && file.size < 700000) {
+                try {
+                    console.log("ShiftSchedule: Converting small PDF to base64...");
+                    const base64Url = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    
+                    if (base64Url.length < 900000) {
+                        downloadUrl = base64Url;
+                        console.log("ShiftSchedule: PDF Base64 conversion successful.");
+                    } else {
+                        console.log("ShiftSchedule: PDF Base64 too large, falling back to storage upload.");
+                    }
+                } catch (e) {
+                    console.warn("ShiftSchedule: PDF Base64 conversion failed, falling back...", e);
                 }
             }
             
