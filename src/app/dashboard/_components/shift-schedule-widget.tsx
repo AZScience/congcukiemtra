@@ -187,7 +187,7 @@ export default function ShiftScheduleWidget() {
                     })();
                     
                     try {
-                        const url = await withTimeout(firebaseUploadPromise, 5000, "Firebase Upload Timeout");
+                        const url = await withTimeout(firebaseUploadPromise, 60000, "Firebase Upload Timeout");
                         console.log("ShiftSchedule: Firebase upload successful.");
                         downloadUrl = url;
                     } catch (fbErr: any) {

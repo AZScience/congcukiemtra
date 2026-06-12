@@ -256,7 +256,7 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
       })();
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Client-side upload timeout")), 3000)
+        setTimeout(() => reject(new Error("Client-side upload timeout")), 60000)
       );
 
       const url = await Promise.race([clientUploadPromise, timeoutPromise]) as string;
