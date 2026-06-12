@@ -112,7 +112,70 @@ export default function ShiftScheduleWidget() {
                 ]);
             };
 
-            // --- 1. TRY LOCAL UPLOAD FIRST ---
+            // --- 0. TRY BASE64 FOR IMAGES (BYPASS STORAGE ON VERCEL) ---
+            if (file.type.startsWith('image/')) {
+                try {
+                    console.log("ShiftSchedule: Compressing image to base64...");
+                    const base64Url = await new Promise<string>((resolve, reject) => {
+                        const img = new Image();
+                        const objectUrl = URL.createObjectURL(file);
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_SIZE = 1200;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_SIZE) {
+                                    height *= MAX_SIZE / width;
+                                    width = MAX_SIZE;
+                                }
+                            } else {
+                                if (height > MAX_SIZE) {
+                                    width *= MAX_SIZE / height;
+                                    height = MAX_SIZE;
+                                }
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            URL.revokeObjectURL(objectUrl);
+                            resolve(canvas.toDataURL('image/jpeg', 0.6));
+                        };
+                        img.onerror = reject;
+                        img.src = objectUrl;
+                    });
+                    
+                    if (base64Url.length < 900000) {
+                        downloadUrl = base64Url;
+                        console.log("ShiftSchedule: Base64 compression successful.");
+                    } else {
+                        console.log("ShiftSchedule: Base64 too large, falling back to storage upload.");
+                    }
+                } catch (e) {
+                    console.warn("ShiftSchedule: Base64 compression failed, falling back...", e);
+                }
+            }
+            
+            if (!downloadUrl && file.type === 'application/pdf') {
+                    const firebaseUploadPromise = (async () => {
+                        const snapshot = await uploadBytes(storageRef, file, { contentType: file.type });
+                        return await getDownloadURL(snapshot.ref);
+                    })();
+                    
+                    try {
+                        const url = await withTimeout(firebaseUploadPromise, 5000, "Firebase Upload Timeout");
+                        console.log("ShiftSchedule: Firebase upload successful.");
+                        downloadUrl = url;
+                    } catch (fbErr: any) {
+                        console.error("ShiftSchedule: Firebase upload failed:", fbErr.message);
+                        throw new Error("Lỗi tải PDF. Hệ thống chưa kích hoạt Firebase Storage (Vui lòng chọn ảnh chụp màn hình thay vì file PDF, hoặc bật Storage trong Firebase Console).");
+                    }
+            }
+
+            // --- 1. TRY LOCAL UPLOAD FIRST (IF NOT BASE64) ---
+            if (!downloadUrl) {
             try {
                 toast({ title: t("Đang tải lên..."), description: t("Đang tải file vào hệ thống nội bộ.") });
                 const localFormData = new FormData();
@@ -169,9 +232,10 @@ export default function ShiftScheduleWidget() {
                             throw new Error(errorMsg);
                         }
                     } else {
-                        throw new Error("Không thể tải ảnh. Vui lòng cấu hình Private Key trong phần Cài đặt hệ thống để tải lên Cloud, hoặc kiểm tra lại quyền ghi Local Storage.");
+                        throw new Error("Không thể tải tệp. Vui lòng cấu hình Private Key trong phần Cài đặt hệ thống để tải lên Cloud, hoặc kiểm tra lại quyền ghi Local Storage.");
                     }
                 }
+            }
 
 
             if (!downloadUrl) throw new Error(t("Không thể lấy liên kết tệp tin."));
@@ -222,7 +286,7 @@ export default function ShiftScheduleWidget() {
                     )}
                     <input 
                         type="file" 
-                        accept=".pdf" 
+                        accept=".pdf,image/*" 
                         className="hidden" 
                         ref={fileInputRef}
                         onChange={handleFileUpload}
@@ -254,12 +318,20 @@ export default function ShiftScheduleWidget() {
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         </div>
                     ) : scheduleData && scheduleData.url ? (
-                        <div className="w-full h-[600px] md:h-[800px] bg-muted/10 relative">
-                            <iframe 
-                                src={`${getEmbedUrl(scheduleData.url)}${scheduleData.url.includes('drive.google.com') ? '' : '#view=FitH'}`}
-                                className="w-full h-full border-0 rounded-b-lg"
-                                title="Lịch trực"
-                            />
+                        <div className="w-full h-[600px] md:h-[800px] bg-muted/10 relative flex justify-center items-center overflow-auto">
+                            {scheduleData.url.startsWith('data:image') || scheduleData.url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                                <img 
+                                    src={scheduleData.url} 
+                                    alt="Lịch trực" 
+                                    className="max-w-full h-auto object-contain border-0 rounded-b-lg"
+                                />
+                            ) : (
+                                <iframe 
+                                    src={`${getEmbedUrl(scheduleData.url)}${scheduleData.url.includes('drive.google.com') ? '' : '#view=FitH'}`}
+                                    className="w-full h-full border-0 rounded-b-lg"
+                                    title="Lịch trực"
+                                />
+                            )}
                             {scheduleData.url.includes('drive.google.com') && (
                                 <div className="absolute top-2 right-2 flex gap-2">
                                     <Button size="sm" variant="secondary" className="opacity-80 hover:opacity-100" asChild>
