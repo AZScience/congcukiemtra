@@ -445,6 +445,61 @@ export default function DocumentRecordsPage() {
             const uploadTimeout = 8000; // 8 seconds for client-side attempt
             let url = '';
 
+            // --- 0. TRY BASE64 FOR IMAGES (BYPASS STORAGE ON VERCEL) ---
+            if (file.type.startsWith('image/')) {
+                try {
+                    console.log("Compressing document image to base64...");
+                    const base64Url = await new Promise<string>((resolve, reject) => {
+                        const img = new Image();
+                        const objectUrl = URL.createObjectURL(file);
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_SIZE = 1200;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_SIZE) {
+                                    height *= MAX_SIZE / width;
+                                    width = MAX_SIZE;
+                                }
+                            } else {
+                                if (height > MAX_SIZE) {
+                                    width *= MAX_SIZE / height;
+                                    height = MAX_SIZE;
+                                }
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            URL.revokeObjectURL(objectUrl);
+                            resolve(canvas.toDataURL('image/jpeg', 0.6));
+                        };
+                        img.onerror = reject;
+                        img.src = objectUrl;
+                    });
+                    
+                    if (base64Url.length < 900000) {
+                        url = base64Url;
+                        console.log("Base64 compression successful.");
+                        
+                        setFormData(prev => ({ ...prev, originalFile: url }));
+                        toast({ title: t("Tải lên thành công"), description: file.name });
+                        triggerAIExtraction(file.name);
+                        
+                        setIsUploading(false);
+                        setUploadProgress(0);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return; // Exit early since upload succeeded
+                    } else {
+                        console.log("Base64 too large, falling back to storage upload.");
+                    }
+                } catch (e) {
+                    console.warn("Base64 compression failed, falling back...", e);
+                }
+            }
+
             // --- 1. TRY CLIENT-SIDE UPLOAD (with timeout) ---
             try {
                 console.log("Attempting client-side Firebase upload...");
@@ -535,10 +590,14 @@ export default function DocumentRecordsPage() {
                     url = (firebaseResult as any).url;
                     console.log("Server-side Firebase upload successful:", url);
                 } else {
-                    let errorMsg = "Tải file thất bại.\n";
-                    if (driveFolderId) errorMsg += `- Google Drive: ${driveResult?.error || 'Lỗi không xác định'}\n`;
-                    errorMsg += `- Firebase: ${firebaseResult?.error || 'Lỗi không xác định'}`;
-                    throw new Error(errorMsg);
+                    if (file.type === 'application/pdf') {
+                        throw new Error("Lỗi tải PDF. Hệ thống chưa kích hoạt Firebase Storage (Vui lòng bật Storage trong Firebase Console, hoặc chọn định dạng ảnh chụp màn hình).");
+                    } else {
+                        let errorMsg = "Tải file thất bại.\n";
+                        if (driveFolderId) errorMsg += `- Google Drive: ${driveResult?.error || 'Lỗi không xác định'}\n`;
+                        errorMsg += `- Firebase: ${firebaseResult?.error || 'Lỗi không xác định'}`;
+                        throw new Error(errorMsg);
+                    }
                 }
             }
 
