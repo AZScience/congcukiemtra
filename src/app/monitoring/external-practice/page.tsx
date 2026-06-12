@@ -338,7 +338,7 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="pt-2 pb-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-6 text-sm bg-muted/20 p-4 rounded-lg">
+                                    <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-y-4 gap-x-6 text-sm bg-muted/20 p-4 rounded-lg", mode !== 'add' && mode !== 'view' && "pointer-events-none opacity-60")}>
                                         <div className="space-y-1">
                                             <Label className="text-muted-foreground flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> Ngày</Label>
                                             {(mode === 'add' || mode === 'copy') ? 
@@ -445,7 +445,7 @@ const EditDialog = ({ open, onOpenChange, mode, formData: initialFormData, onSav
                                                         </Label>
                                                     </div>
                                                 </div>
-                                                <div className="space-y-2"><Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-orange-600" /> Chi tiết sự cố</Label><Input value={formData.incidentDetail || ''} onChange={e => setFormData({...formData, incidentDetail: e.target.value})} disabled={mode === 'view'} /></div>
+                                                <div className="md:col-span-3 space-y-2"><Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-orange-600" /> Chi tiết sự cố</Label><Input value={formData.incidentDetail || ''} onChange={e => setFormData({...formData, incidentDetail: e.target.value})} disabled={mode === 'view'} /></div>
                                                 {mode === 'view' && (
                                                     <>
                                                         <div className="space-y-2">

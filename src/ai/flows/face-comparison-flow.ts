@@ -47,9 +47,10 @@ async function getVisionModel(apiKey?: string) {
     if (!key) throw new Error("API Key cho AI chưa được cấu hình. Vui lòng kiểm tra Tham số hệ thống.");
     
     const genAI = new GoogleGenerativeAI(key);
+    // Return a default model but let the caller handle it or we can just use 3.1
     return genAI.getGenerativeModel(
-        { model: "gemini-1.5-flash" },
-        { apiVersion: 'v1' }
+        { model: "gemini-3.1-flash" },
+        { apiVersion: 'v1beta' }
     );
 }
 

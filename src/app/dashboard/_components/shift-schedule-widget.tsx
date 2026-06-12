@@ -112,26 +112,28 @@ export default function ShiftScheduleWidget() {
                 ]);
             };
 
-            // --- 1. TRY CLIENT-SIDE FIREBASE UPLOAD ---
+            // --- 1. TRY LOCAL UPLOAD FIRST ---
             try {
-                toast({ title: t("Đang thử tải lên..."), description: t("Cố gắng tải trực tiếp lên Firebase Storage.") });
-                const clientUploadPromise = (async () => {
-                    const uploadResult = await uploadBytes(storageRef, file);
-                    console.log("ShiftSchedule: Client-side Firebase Upload successful");
-                    return await getDownloadURL(uploadResult.ref);
-                })();
+                toast({ title: t("Đang tải lên..."), description: t("Đang tải file vào hệ thống nội bộ.") });
+                const localFormData = new FormData();
+                localFormData.append('file', file);
+                const localRes = await fetch('/api/upload', { method: 'POST', body: localFormData });
+                const localData = await localRes.json();
+                if (localData.success && localData.url) {
+                    console.log("ShiftSchedule: Local upload successful.");
+                    downloadUrl = localData.url;
+                } else {
+                    throw new Error(localData.error || "Lỗi tải file nội bộ");
+                }
+            } catch (localErr: any) {
+                console.warn("ShiftSchedule: Local upload failed, falling back to cloud...", localErr.message);
                 
-                downloadUrl = await withTimeout(clientUploadPromise, 20000, "Firebase client-side timeout");
-            } catch (firebaseErr: any) {
-                console.warn("ShiftSchedule: Client-side upload failed or timed out, trying Server-side Firebase...", firebaseErr.message);
-                toast({ title: t("Đang chuyển hướng..."), description: t("Mạng nội bộ có thể bị chặn, đang thử tải qua Server.") });
-                
-                // --- 2. TRY SERVER-SIDE FIREBASE UPLOAD (Bypasses local network blocks) ---
+                // --- 2. TRY SERVER-SIDE CLOUD UPLOADS (DRIVE / FIREBASE) ---
                 const serviceAccountEmail = (params.evidenceServiceAccountEmail || params.googleServiceAccountEmail || "").trim();
                 const privateKey = (params.evidencePrivateKey || params.googlePrivateKey || "");
+                const folderId = (params.evidenceGoogleDriveFolderId || params.googleDriveFolderId || "").trim();
                 
                 if (serviceAccountEmail && privateKey) {
-                    try {
                         const serverFormData = new FormData();
                         serverFormData.append('file', file);
                         serverFormData.append('clientEmail', serviceAccountEmail);
@@ -139,45 +141,38 @@ export default function ShiftScheduleWidget() {
                         serverFormData.append('projectId', firebaseConfig.projectId || '');
                         serverFormData.append('storageBucket', firebaseConfig.storageBucket || '');
 
-                        const serverResult = await withTimeout(uploadToFirebaseServer(serverFormData), 30000, "Firebase server-side timeout");
-                        if (serverResult.success && serverResult.url) {
-                            downloadUrl = serverResult.url;
-                            console.log("ShiftSchedule: Server-side Firebase upload successful.");
+                        const firebaseUploadPromise = uploadToFirebaseServer(serverFormData).catch(e => ({ success: false, error: e.message }));
+
+                        let driveUploadPromise: Promise<any> = Promise.resolve({ success: false, error: 'Chưa cấu hình Drive' });
+                        if (folderId) {
+                            const driveFormData = new FormData();
+                            driveFormData.append('file', file);
+                            driveFormData.append('folderId', folderId);
+                            driveFormData.append('serviceAccountEmail', serviceAccountEmail);
+                            driveFormData.append('privateKey', privateKey);
+                            driveUploadPromise = uploadToGoogleDrive(driveFormData).catch(e => ({ success: false, error: e.message }));
                         }
-                    } catch (serverErr: any) {
-                        console.warn("ShiftSchedule: Server-side upload failed or timed out:", serverErr.message);
-                    }
-                }
 
-                // --- 3. TRY GOOGLE DRIVE FALLBACK (If Firebase still fails) ---
-                if (!downloadUrl) {
-                    toast({ title: t("Đang dùng dự phòng..."), description: t("Đang tải lên Google Drive.") });
-                    console.log("ShiftSchedule: Firebase failed, trying Google Drive fallback...");
-                    const folderId = (params.evidenceGoogleDriveFolderId || params.googleDriveFolderId || "").trim();
+                        const [firebaseResult, driveResult] = await Promise.all([
+                            withTimeout(firebaseUploadPromise, 30000, "Firebase timeout"),
+                            withTimeout(driveUploadPromise, 40000, "Drive timeout")
+                        ]);
 
-                    if (!serviceAccountEmail || !privateKey || !folderId) {
-                        throw new Error(t("Lỗi kết nối và chưa cấu hình Google Drive dự phòng (vui lòng kiểm tra tab Minh chứng)."));
-                    }
-
-                    const gdriveFormData = new FormData();
-                    gdriveFormData.append('file', file);
-                    gdriveFormData.append('folderId', folderId);
-                    gdriveFormData.append('serviceAccountEmail', serviceAccountEmail);
-                    gdriveFormData.append('privateKey', privateKey);
-
-                    try {
-                        const result = await withTimeout(uploadToGoogleDrive(gdriveFormData), 40000, "Google Drive timeout");
-                        if (result.success && result.url) {
-                            downloadUrl = result.url;
-                            console.log("ShiftSchedule: Google Drive fallback successful.");
+                        if (driveResult && driveResult.success && driveResult.url) {
+                            downloadUrl = driveResult.url;
+                        } else if (firebaseResult && firebaseResult.success && firebaseResult.url) {
+                            downloadUrl = firebaseResult.url;
                         } else {
-                            throw new Error(result.error || t("Google Drive upload failed."));
+                            let errorMsg = "Tải file thất bại.\n";
+                            if (folderId) errorMsg += `- Google Drive: ${driveResult?.error || 'Lỗi không xác định'}\n`;
+                            errorMsg += `- Firebase: ${firebaseResult?.error || 'Lỗi không xác định'}`;
+                            throw new Error(errorMsg);
                         }
-                    } catch (driveErr: any) {
-                        throw new Error(driveErr.message || t("Tất cả các phương thức tải lên đều thất bại hoặc quá thời gian."));
+                    } else {
+                        throw new Error("Không thể tải ảnh. Vui lòng cấu hình Private Key trong phần Cài đặt hệ thống để tải lên Cloud, hoặc kiểm tra lại quyền ghi Local Storage.");
                     }
                 }
-            }
+
 
             if (!downloadUrl) throw new Error(t("Không thể lấy liên kết tệp tin."));
 

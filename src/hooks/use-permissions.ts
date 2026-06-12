@@ -99,8 +99,8 @@ export function usePermissions(pageId?: string) {
     
     // Find corresponding static role to get defaults
     const staticRole = staticRoles.find(sr => 
-      (userRole && sr.id.toLowerCase() === userRole.id.toLowerCase()) || 
-      (userRole && sr.name.trim().toLowerCase() === userRole.name.trim().toLowerCase())
+      (userRole && userRole.id && sr.id?.toLowerCase() === userRole.id.toLowerCase()) || 
+      (userRole && userRole.name && sr.name?.trim().toLowerCase() === userRole.name.trim().toLowerCase())
     );
     
     if (staticRole) {

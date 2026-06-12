@@ -136,7 +136,7 @@ export const assistantFlow = ai.defineFlow(
             // 2. Retry logic across different models and versions to prevent 404/403/429
             // Priority order: requested -> 1.5-flash (stable) -> 1.5-flash-8b (lightweight) -> 2.0-flash (fast) -> 2.0-flash-lite
             const requestedModel = (input.aiModel || "gemini-1.5-flash").trim().replace(/^models\//, "");
-            const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+            const fallbackModels = ["gemini-3.1-flash", "gemini-3.0-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash-lite"];
             const modelQueue = Array.from(new Set([requestedModel, ...fallbackModels]));
             const modelsToTry = modelQueue.map(name => ({ name, version: 'v1beta' as const }));
 
@@ -174,10 +174,10 @@ export const assistantFlow = ai.defineFlow(
             }
 
             if (isQuotaExceeded) {
-                throw new Error("Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút, đổi sang Model khác (ví dụ: gemini-1.5-flash-8b) hoặc kiểm tra lại giới hạn của API Key trong Google AI Studio.");
+                throw new Error(`Hết hạn mức (Quota exceeded). Chi tiết lỗi: ${lastError}`);
             }
 
-            throw new Error(lastError || "Tất cả các model đều không phản hồi.");
+            throw new Error(`Lỗi không xác định từ AI: ${lastError || "Tất cả các model đều không phản hồi."}`);
 
         } catch (e: any) {
             console.error("AI Assistant Error:", e);

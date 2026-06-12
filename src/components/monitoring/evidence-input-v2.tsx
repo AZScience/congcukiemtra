@@ -218,44 +218,69 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
     } catch (clientError: any) {
       console.warn("Client-side upload failed, falling back to server-side:", clientError.message);
       
-      // --- 2. TRY SERVER-SIDE FIREBASE UPLOAD ---
       if (serviceAccountEmail && privateKey) {
         try {
-          console.log("Attempting server-side Firebase upload...");
+          console.log("Attempting local upload first...");
           const uploadFile = new File([blob], sanitizeFileName(fileName), { type: blob.type || 'application/octet-stream' });
-          const formData = new FormData();
-          formData.append('file', uploadFile);
-          formData.append('clientEmail', serviceAccountEmail);
-          formData.append('privateKey', privateKey);
-          formData.append('projectId', firebaseConfig.projectId || '');
-          formData.append('storageBucket', firebaseConfig.storageBucket || '');
-
-          const result = await uploadToFirebaseServer(formData);
-          if (result.success && result.url) {
-            console.log("Server-side upload success:", result.url);
-            return result.url;
-          }
           
-          // --- 3. TRY GOOGLE DRIVE FALLBACK ---
-          // Fallback to Drive if server-side upload fails for ANY reason
-          if (driveFolderId && !result.success) {
-            console.log("Attempting Google Drive fallback upload...");
+          try {
+            const localFormData = new FormData();
+            localFormData.append('file', uploadFile);
+            const localRes = await fetch('/api/upload', { method: 'POST', body: localFormData });
+            const localData = await localRes.json();
+            if (localData.success && localData.url) {
+                console.log("Local upload successful:", localData.url);
+                return localData.url;
+            }
+          } catch (localErr) {
+            console.warn("Local upload failed, falling back to cloud...", localErr);
+          }
+
+          console.log("Attempting server-side cloud uploads...");
+          const firebaseFormData = new FormData();
+          firebaseFormData.append('file', uploadFile);
+          firebaseFormData.append('clientEmail', serviceAccountEmail);
+          firebaseFormData.append('privateKey', privateKey);
+          firebaseFormData.append('projectId', firebaseConfig.projectId || '');
+          firebaseFormData.append('storageBucket', firebaseConfig.storageBucket || '');
+
+          // Khởi chạy Firebase Upload
+          const firebaseUploadPromise = uploadToFirebaseServer(firebaseFormData).catch(e => ({ success: false, error: e.message }));
+
+          // Khởi chạy Drive Upload (nếu có cấu hình)
+          let driveUploadPromise: Promise<any> = Promise.resolve({ success: false, error: 'Chưa cấu hình Drive' });
+          if (driveFolderId) {
             const { uploadToGoogleDrive } = await import('@/ai/flows/google-drive-upload');
             const driveFormData = new FormData();
             driveFormData.append('file', uploadFile);
             driveFormData.append('folderId', driveFolderId);
             driveFormData.append('serviceAccountEmail', serviceAccountEmail);
             driveFormData.append('privateKey', privateKey);
-
-            const driveResult = await uploadToGoogleDrive(driveFormData);
-            if (driveResult.success && driveResult.url) {
-              console.log("Google Drive upload success:", driveResult.url);
-              return driveResult.url;
-            }
-            throw new Error(driveResult.error || result.error || 'Drive upload failed');
+            driveUploadPromise = uploadToGoogleDrive(driveFormData).catch(e => ({ success: false, error: e.message }));
           }
+
+          // Chạy song song cả 2
+          const [firebaseResult, driveResult] = await Promise.all([firebaseUploadPromise, driveUploadPromise]);
+
+          console.log("Upload Results:", { firebase: firebaseResult, drive: driveResult });
+
+          // Ưu tiên trả về link Google Drive nếu thành công (vì dễ xem hơn)
+          if (driveResult && driveResult.success && (driveResult as any).url) {
+            return (driveResult as any).url;
+          }
+
+          // Nếu Drive thất bại nhưng Firebase thành công, trả về link Firebase
+          if (firebaseResult && firebaseResult.success && (firebaseResult as any).url) {
+            return (firebaseResult as any).url;
+          }
+
+          // Nếu CẢ 2 ĐỀU THẤT BẠI
+          let errorMsg = "Tải file thất bại.\n";
+          if (driveFolderId) errorMsg += `- Google Drive: ${driveResult?.error || 'Lỗi không xác định'}\n`;
+          errorMsg += `- Firebase: ${firebaseResult?.error || 'Lỗi không xác định'}`;
           
-          throw new Error(result.error || 'Server upload failed');
+          throw new Error(errorMsg);
+
         } catch (serverError: any) {
           console.error("Server-side/Drive upload failed:", serverError.message);
           throw serverError;

@@ -15,7 +15,7 @@ import {
   Search, Filter, Calendar, User, FileText, Image as ImageIcon, 
   ExternalLink, Eye, Download, Library, LayoutGrid, List,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X,
-  Clock, CheckCircle2, AlertCircle, MapPin, Camera, Trash2
+  Clock, CheckCircle2, AlertCircle, MapPin, Camera, Trash2, FileType, Video
 } from 'lucide-react';
 import { format, parse, isValid, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import PageHeader from "@/components/page-header";
@@ -97,6 +97,7 @@ export default function EvidenceManagementPage() {
     const [previewItem, setPreviewItem] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterSource, setFilterSource] = useState<string>('all');
+    const [filterType, setFilterType] = useState<string>('all');
     const [filterDate, setFilterDate] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(12);
@@ -387,9 +388,20 @@ export default function EvidenceManagementPage() {
                     item.date.getDate() === filterDateObj.getDate();
             }
 
-            return matchesSearch && matchesSource && matchesDate;
+            let matchesType = true;
+            if (filterType !== 'all') {
+                if (filterType === 'image') {
+                    matchesType = item.items.some(i => isImage(i));
+                } else if (filterType === 'video') {
+                    matchesType = item.items.some(i => isVideo(i));
+                } else if (filterType === 'document') {
+                    matchesType = item.items.some(i => isDocument(i));
+                }
+            }
+
+            return matchesSearch && matchesSource && matchesDate && matchesType;
         });
-    }, [allEvidence, searchTerm, filterSource, filterDate]);
+    }, [allEvidence, searchTerm, filterSource, filterType, filterDate]);
 
     // --- Pagination ---
     const totalPages = Math.ceil(filteredEvidence.length / itemsPerPage);
@@ -507,6 +519,15 @@ export default function EvidenceManagementPage() {
         return data.startsWith('data:image') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(data) || data.includes('photo') || data.includes('image');
     };
 
+    const isVideo = (item: string) => {
+        const { data } = parseEvidenceItem(item);
+        return data.startsWith('data:video') || /\.(mp4|webm|ogg|mov)$/i.test(data) || data.includes('video');
+    };
+
+    const isDocument = (item: string) => {
+        return !isImage(item) && !isVideo(item);
+    };
+
     return (
         <ClientOnly>
             <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 bg-slate-50/50 min-h-screen">
@@ -573,6 +594,22 @@ export default function EvidenceManagementPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="w-[180px]">
+                            <Select value={filterType} onValueChange={setFilterType}>
+                                <SelectTrigger className="h-10">
+                                    <div className="flex items-center gap-2">
+                                        <FileType className="h-4 w-4 text-muted-foreground" />
+                                        <SelectValue placeholder="Loại file" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tất cả loại file</SelectItem>
+                                    <SelectItem value="image">Hình ảnh</SelectItem>
+                                    <SelectItem value="video">Video</SelectItem>
+                                    <SelectItem value="document">Tài liệu</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <div className="w-[180px] relative">
                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
                             <Input 
@@ -582,8 +619,8 @@ export default function EvidenceManagementPage() {
                                 onChange={(e) => setFilterDate(e.target.value)}
                             />
                         </div>
-                        {(searchTerm || filterSource !== 'all' || filterDate) && (
-                            <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setFilterSource('all'); setFilterDate(''); }} className="h-10 px-2 text-destructive hover:bg-destructive/10">
+                        {(searchTerm || filterSource !== 'all' || filterType !== 'all' || filterDate) && (
+                            <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setFilterSource('all'); setFilterType('all'); setFilterDate(''); }} className="h-10 px-2 text-destructive hover:bg-destructive/10">
                                 <X className="h-4 w-4 mr-2" /> Xóa lọc
                             </Button>
                         )}
@@ -607,10 +644,11 @@ export default function EvidenceManagementPage() {
                                     colSpan={1} 
                                     icon={ImageIcon}
                                     title="Không tìm thấy minh chứng nào phù hợp"
-                                    filters={{ searchTerm, filterSource, filterDate }}
+                                    filters={{ searchTerm, filterSource, filterType, filterDate }}
                                     onClearFilters={() => {
                                         setSearchTerm('');
                                         setFilterSource('all');
+                                        setFilterType('all');
                                         setFilterDate('');
                                         setCurrentPage(1);
                                     }}

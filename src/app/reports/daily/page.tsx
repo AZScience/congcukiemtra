@@ -320,7 +320,6 @@ export default function DailyReportPage() {
           // Xác định dòng bắt đầu: VIPHAM từ dòng 8, các sheet khác từ dòng 7
           const dataStartRow = cfg.key === "VIPHAM" ? 8 : 7;
           
-          worksheet.getCell('A1').value = dateHeader;
           worksheet.getCell('A5').value = dateHeader;
 
           // Ghi dữ liệu hàng loạt và kẻ khung

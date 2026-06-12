@@ -135,6 +135,7 @@ export const menuItems = [
       { label: "Tham số hệ thống", href: "/settings/parameters", icon: SlidersHorizontal, iconColor: "text-lime-500" },
       { label: "Phân quyền truy cập", href: "/settings/permissions", icon: Lock, iconColor: "text-orange-500" },
       { label: "Nhật ký truy cập", href: "/settings/access-log", icon: History, iconColor: "text-cyan-500" },
+      { label: "Sao lưu & Phục hồi", href: "/settings/backup", icon: DatabaseZap, iconColor: "text-indigo-500" },
     ],
   },
   {

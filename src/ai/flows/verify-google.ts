@@ -21,7 +21,15 @@ export async function verifyGoogleSheetConnection(
     privateKey: string,
     tabName?: string
 ) {
-    if (!sheetId || !email || !privateKey) {
+    let finalSheetId = sheetId.trim();
+    if (finalSheetId.includes('docs.google.com/spreadsheets/d/')) {
+        const match = finalSheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+            finalSheetId = match[1];
+        }
+    }
+
+    if (!finalSheetId || !email || !privateKey) {
         return { success: false, message: "Vui lòng nhập đầy đủ Sheet ID, Email và Private Key." };
     }
 
@@ -32,7 +40,7 @@ export async function verifyGoogleSheetConnection(
             scopes: ['https://www.googleapis.com/auth/spreadsheets'],
         });
 
-        const doc = new GoogleSpreadsheet(sheetId, serviceAccountAuth);
+        const doc = new GoogleSpreadsheet(finalSheetId, serviceAccountAuth);
         await doc.loadInfo();
         
         let tabMsg = "";
@@ -56,8 +64,11 @@ export async function verifyGoogleSheetConnection(
         let rawMsg = error.message || "";
         if (error.response?.data?.error_description) rawMsg = error.response.data.error_description;
         if (error.response?.data?.error?.message) rawMsg = error.response.data.error.message;
-        
         let msg = rawMsg || "Không thể kết nối Google Sheet (Lỗi không xác định).";
+        
+        if (msg.includes("invalid argument")) {
+            msg = `Lỗi Google Sheet ID không hợp lệ: "${finalSheetId}". Xin đảm bảo đây là ID của tệp Excel, không phải ID thư mục!`;
+        }
         
         if (msg.toLowerCase().includes("invalid_grant")) {
             msg = "Lỗi xác thực (invalid_grant): Email hoặc Private Key của Service Account không chính xác.";

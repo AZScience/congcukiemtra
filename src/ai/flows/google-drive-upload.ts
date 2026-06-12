@@ -120,7 +120,7 @@ export async function uploadToGoogleDrive(formData: FormData) {
             // Thông báo lỗi cực kỳ chi tiết cho người dùng
             let friendlyError = `Không thể tải lên thư mục Drive (${folderId}). `;
             if (uploadRes.status === 404) friendlyError += "Lý do: Không tìm thấy thư mục (Sai ID).";
-            else if (uploadRes.status === 403) friendlyError += `Lý do: Tài khoản "${serviceAccountEmail}" bị từ chối quyền truy cập.${diagnosticInfo}`;
+            else if (uploadRes.status === 403) friendlyError += `Lý do: Google từ chối truy cập. Chi tiết lỗi Google: "${uploadData.error?.message}". ${diagnosticInfo}`;
             else friendlyError += `Lỗi hệ thống: ${uploadData.error?.message || "Không xác định"}`;
             
             throw new Error(friendlyError);

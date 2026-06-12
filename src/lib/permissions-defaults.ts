@@ -11,7 +11,7 @@ export const ALL_MODULE_IDS = [
     '/monitoring/asset-check', '/monitoring/requests', '/monitoring/petitions',
     '/reports/daily', '/reports/comprehensive', '/reports/student-violations', 
     '/reports/good-deeds', '/reports/request-reports', '/reports/incident-reports',
-    '/settings/schedule', '/settings/parameters', '/settings/permissions', '/settings/access-log',
+    '/settings/schedule', '/settings/parameters', '/settings/permissions', '/settings/access-log', '/settings/backup',
     '/monitoring/external-checkins', '/monitoring/online-classes', '/monitoring/document-records', '/monitoring/document-lookup', '/lecturer-portal', 
     '/feedback', '/monitoring/evidence', '/ai/assistant', '/discussion', '/messaging'
 ];

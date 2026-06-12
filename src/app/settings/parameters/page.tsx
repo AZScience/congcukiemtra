@@ -599,11 +599,14 @@ export default function SystemParametersPage() {
                         <SelectValue placeholder="Chọn model..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Mạnh nhất - Dễ hết hạn mức)</SelectItem>
-                        <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Cân bằng - Khuyên dùng)</SelectItem>
-                        <SelectItem value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8b (Rất nhanh - Tiết kiệm nhất)</SelectItem>
-                        <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Thế hệ mới - Nhanh)</SelectItem>
-                        <SelectItem value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash Lite (Xem trước)</SelectItem>
+                        <SelectItem value="gemini-3.1-flash">Gemini 3.1 Flash (Mới nhất - Nhanh & Mạnh)</SelectItem>
+                        <SelectItem value="gemini-3.1-pro">Gemini 3.1 Pro (Mới nhất - Tư duy sâu)</SelectItem>
+                        <SelectItem value="gemini-3.0-flash">Gemini 3.0 Flash</SelectItem>
+                        <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                        <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                        <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                        <SelectItem value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8b</SelectItem>
+                        <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

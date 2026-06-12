@@ -26,9 +26,10 @@ export async function uploadToFirebaseServer(formData: FormData) {
         const { token } = await auth.getAccessToken();
         if (!token) throw new Error("Không thể lấy Access Token từ Service Account.");
 
-        // Ưu tiên bucket được truyền từ client (cấu hình trong system params)
+        // Ưu tiên bucket được truyền từ client
         const bucketNames = [
             storageBucket,
+            storageBucket.replace('.firebasestorage.app', '.appspot.com'),
             'kiemtranoibo-ccks.firebasestorage.app',
             'kiemtranoibo-ccks.appspot.com',
             'kiemtranoibo-493603.appspot.com',

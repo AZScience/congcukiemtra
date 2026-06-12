@@ -12,8 +12,8 @@ export async function verifyAIConnection(apiKey: string, model: string): Promise
 
         const genAI = new GoogleGenerativeAI(key);
         
-        const requestedModel = (model || "gemini-1.5-flash").trim().replace(/^models\//, "");
-        const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"];
+        const requestedModel = (model || "gemini-3.1-flash").trim().replace(/^models\//, "");
+        const fallbackModels = ["gemini-3.1-flash", "gemini-3.0-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
         const modelQueue = Array.from(new Set([requestedModel, ...fallbackModels]));
 
         let lastError = "";
@@ -39,11 +39,11 @@ export async function verifyAIConnection(apiKey: string, model: string): Promise
 
         let msg = lastError;
         if (msg.includes("429") || msg.includes("quota")) {
-            msg = "Hết hạn mức (Quota exceeded). Vui lòng thử lại sau 1 phút hoặc đổi sang API Key khác.";
+            msg = `Hết hạn mức (Quota). Chi tiết: ${lastError}`;
         } else if (msg.includes("payment") || msg.includes("funds") || msg.includes("OR_FGVEM_40")) {
-            msg = "Lỗi thanh toán/hết số dư (OR_FGVEM_40). Vui lòng kiểm tra Billing trên Google Cloud.";
+            msg = `Lỗi thanh toán Google Cloud (OR_FGVEM_40). Chi tiết: ${lastError}`;
         }
-        return { success: false, message: `Lỗi kết nối: ${msg}` };
+        return { success: false, message: `Lỗi AI: ${msg}` };
     } catch (e: any) {
         console.error("AI Verification Error:", e);
         let msg = e.message;
