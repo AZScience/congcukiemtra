@@ -72,19 +72,7 @@ export default function BackupRestorePage() {
             const min = String(now.getMinutes()).padStart(2, '0');
             const filename = `backup_${dd}-${mm}-${yyyy}_${hh}-${min}.json`;
 
-            // Gọi API để lưu file trên server
-            const response = await fetch('/api/backup-save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: backupData, filename })
-            });
-
-            const result = await response.json();
-            if (!result.success) {
-                throw new Error(result.error || 'Lỗi khi lưu file trên server');
-            }
-
-            // Đồng thời cũng tải file về máy người dùng
+            // 1. Luôn tải file về máy người dùng trước để đảm bảo an toàn dữ liệu
             const jsonString = JSON.stringify(backupData, null, 2);
             const blob = new Blob([jsonString], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -94,15 +82,32 @@ export default function BackupRestorePage() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            toast({ title: "Thành công", description: `Đã lưu bản sao lưu tại Local Storage (public/backups/${filename}) và tải về máy.` });
-            
-            // Reload list
-            fetch('/api/backup-list')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) setServerFiles(data.files);
+
+            // 2. Thử lưu file lên server (Có thể thất bại trên Vercel do Payload Too Large > 4.5MB)
+            let serverSaved = false;
+            try {
+                const response = await fetch('/api/backup-save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: backupData, filename })
                 });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        serverSaved = true;
+                        fetchServerFiles();
+                    }
+                }
+            } catch (err) {
+                console.warn("Không thể lưu bản sao lưu lên server (giới hạn Vercel).", err);
+            }
+            
+            if (serverSaved) {
+                toast({ title: "Thành công", description: `Đã lưu bản sao lưu tại server và tải về máy.` });
+            } else {
+                toast({ title: "Thành công", description: `Đã tải bản sao lưu về máy (Không lưu trên server do giới hạn Vercel).` });
+            }
         } catch (error: any) {
             console.error(error);
             toast({ 
