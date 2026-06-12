@@ -3,10 +3,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Upload, Calendar, Loader2, Download, Eye, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { FileText, Upload, Calendar, Loader2, Download, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
 import { useFirestore, useStorage, useUser } from '@/firebase';
-import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from '@/hooks/use-toast';
 import { formatTimeAgo } from '@/lib/utils';
@@ -284,20 +284,6 @@ export default function ShiftScheduleWidget() {
         }
     };
 
-    const handleDelete = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!firestore || !scheduleData) return;
-        if (!confirm(t('Bạn có chắc chắn muốn xóa lịch trực này?'))) return;
-        
-        try {
-            await deleteDoc(doc(firestore, 'system_settings', 'shift_schedule'));
-            toast({ title: t('Thành công'), description: t('Đã xóa lịch trực.') });
-        } catch (error: any) {
-            console.error('Delete error:', error);
-            toast({ variant: 'destructive', title: t('Lỗi'), description: t('Không thể xóa lịch trực.') });
-        }
-    };
-
     const updater = scheduleData ? employees.find(e => e.id === scheduleData.updatedBy) : null;
 
     return (
@@ -337,23 +323,12 @@ export default function ShiftScheduleWidget() {
                         {isUploading ? t('Đang tải...') : (scheduleData?.url ? t('Cập nhật') : t('Tải lên lịch'))}
                     </Button>
                     {scheduleData && scheduleData.url && (
-                        <>
-                            <Button size="sm" variant="default" asChild className="h-8 shrink-0">
-                                <a href={scheduleData.url} target="_blank" rel="noopener noreferrer">
-                                    <Download className="h-4 w-4 mr-2 shrink-0" />
-                                    {t('Tải về')}
-                                </a>
-                            </Button>
-                            <Button 
-                                size="sm" 
-                                variant="destructive" 
-                                className="h-8 w-8 p-0 shrink-0"
-                                onClick={handleDelete}
-                                title={t('Xóa lịch trực')}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </>
+                        <Button size="sm" variant="default" asChild className="h-8 shrink-0">
+                            <a href={scheduleData.url} target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4 mr-2 shrink-0" />
+                                {t('Tải về')}
+                            </a>
+                        </Button>
                     )}
                 </div>
             </CardHeader>
