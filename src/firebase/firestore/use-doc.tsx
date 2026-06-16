@@ -2,7 +2,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onSnapshot, type DocumentReference } from 'firebase/firestore';
+import { onSnapshot, refEqual, type DocumentReference } from 'firebase/firestore';
+
+function isRefEqual(a: DocumentReference | null, b: DocumentReference | null) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return refEqual(a, b);
+  } catch (e) {
+    return false;
+  }
+}
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '../errors';
 import { toast } from '@/hooks/use-toast';
@@ -20,17 +30,24 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference | null) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const memoizedRef = useRef<DocumentReference | null>(null);
+
+  if (!isRefEqual(ref, memoizedRef.current)) {
+    memoizedRef.current = ref;
+  }
+
   useEffect(() => {
     let isMounted = true;
+    const currentRef = memoizedRef.current;
 
-    if (!ref) {
+    if (!currentRef) {
       setData(null);
       setLoading(false);
       return;
     }
 
     const unsubscribe = onSnapshot(
-      ref,
+      currentRef,
       (doc) => {
         if (!isMounted) return;
         try {
@@ -52,7 +69,7 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference | null) 
 
         if (serverError.code === 'permission-denied') {
           const permissionError = new FirestorePermissionError({
-            path: ref.path,
+            path: currentRef.path,
             operation: 'get',
           } satisfies SecurityRuleContext);
           
@@ -82,7 +99,7 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference | null) 
         unsubscribe();
       } catch (e) {}
     };
-  }, [ref]);
+  }, [memoizedRef.current]);
 
   return { data, loading, error };
 }
