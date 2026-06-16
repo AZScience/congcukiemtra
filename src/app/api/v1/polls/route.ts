@@ -4,11 +4,11 @@ import { getFirestore, collection, addDoc, Timestamp } from 'firebase/firestore'
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 
+import { db } from '@/lib/firebase';
 const getDb = async () => {
     const apps = getApps();
     const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
     
     // Đảm bảo có auth context
     if (!auth.currentUser) {

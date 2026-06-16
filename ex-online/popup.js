@@ -110,15 +110,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Khởi tạo ngày hôm nay làm mặc định
 
-  // 1. Tự động lấy link từ Tab hiện tại
+  // 1. Tự động lấy link từ Tab hiện tại và TÌM LỚP TỰ ĐỘNG
   async function refreshMeetingLink() {
     if (!chrome.runtime?.id) return;
     try {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         if (chrome.runtime.lastError) return;
         if (tabs[0] && tabs[0].url) {
+          const url = tabs[0].url;
           const linkEl = document.getElementById('info-meeting-link');
-          if (linkEl) linkEl.textContent = tabs[0].url;
+          if (linkEl) linkEl.textContent = url;
+
+          // Nếu chưa có lớp và chưa có session, thử tìm lớp theo link
+          chrome.storage.local.get(['active_session'], async (result) => {
+            if (!currentClass && !result.active_session && url.includes('meet.google.com')) {
+              console.log("Automatic class identification by link...");
+              await searchClass(url);
+            }
+          });
         }
       });
     } catch (e) { console.warn("Context invalidated"); }
@@ -128,12 +137,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnRefreshLink?.addEventListener('click', refreshMeetingLink);
 
   // 1.1 Tự động lấy thông tin cuộc họp REALTIME
+  let isAutoStarting = false; // Flag tránh lặp lại
+
   async function refreshMeetingInfo() {
     if (!chrome.runtime?.id) return;
     try {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (chrome.runtime.lastError || !tabs[0] || !tabs[0].id) return;
-        chrome.tabs.sendMessage(tabs[0].id, { action: "get_meeting_info" }, (response) => {
+        const expectedHost = currentClass ? (currentClass.Lecturer || currentClass.lecturer) : null;
+        chrome.tabs.sendMessage(tabs[0].id, { action: "get_meeting_info", expectedHost: expectedHost }, (response) => {
           if (chrome.runtime.lastError) return;
           if (response && response.success) {
             const studentCountEl = document.getElementById('info-actual-students');
@@ -154,6 +166,15 @@ document.addEventListener('DOMContentLoaded', async () => {
               if (startBtn) startBtn.classList.remove('host-only-restricted');
               if (syncBtn) syncBtn.classList.remove('host-only-restricted');
               if (pollToggle) pollToggle.classList.remove('host-only-restricted');
+              
+              // --- TỰ ĐỘNG KÍCH HOẠT NẾU LÀ HOST VÀ ĐÃ CÓ LỚP ---
+              chrome.storage.local.get(['active_session'], (result) => {
+                if (currentClass && !result.active_session && !isAutoStarting) {
+                  console.log("Host identified. Auto-starting session...");
+                  isAutoStarting = true;
+                  startSession();
+                }
+              });
             } else {
               if (noticeEl) noticeEl.classList.remove('hidden');
               if (startBtn) startBtn.classList.add('host-only-restricted');
@@ -253,33 +274,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 2. Tìm kiếm lớp học
-  btnSearch.addEventListener('click', async () => {
-    const code = classCodeInput.value.trim().toUpperCase();
-    if (!code) return;
-
+  async function searchClass(query) {
+    if (!query) return;
     showStatus("Đang tìm lớp...", "info");
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       const dateParts = todayStr.split('-'); 
       const dateStr = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-      const url = `${API_BASE}/schedules?class=${encodeURIComponent(code)}&date=${encodeURIComponent(dateStr)}`;
+      const url = `${API_BASE}/schedules?class=${encodeURIComponent(query)}&date=${encodeURIComponent(dateStr)}`;
       const result = await callApi(url);
       
       if (result.success && result.data && result.data.length > 0) {
         const classes = result.data;
         if (classes.length === 1) {
           selectClass(classes[0]);
-          showStatus("Đã tìm thấy lớp!", "success");
+          showStatus("Đã xác định được lớp học!", "success");
         } else {
           displayClassSelection(classes);
-          showStatus(`Tìm thấy ${classes.length} lớp`, "info");
+          showStatus(`Tìm thấy ${classes.length} lớp phù hợp`, "info");
         }
       } else {
-        showStatus("Không tìm thấy lớp học này", "error");
+        showStatus("Không tìm thấy lớp học phù hợp", "error");
       }
     } catch (err) {
       showStatus(`Lỗi: ${err.message}`, "error");
     }
+  }
+
+  btnSearch.addEventListener('click', () => {
+    const code = classCodeInput.value.trim().toUpperCase();
+    searchClass(code);
   });
 
   function selectClass(classData) {
@@ -290,7 +314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     displayClassInfo(currentClass);
     document.getElementById('class-selection').classList.add('hidden');
     document.getElementById('class-info').classList.remove('hidden');
-    if (btnStartSession) btnStartSession.classList.remove('hidden');
+    // Bỏ hiển thị nút Bắt đầu vì sẽ tự động kích hoạt
   }
 
   function displayClassSelection(classes) {
@@ -1357,19 +1381,105 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-reset-memory')?.addEventListener('click', initMemory);
 
-  // 3. SNAKE GAME
-  let snake = [];
-  let apple = { x: 5, y: 5 };
-  let dx = 1, dy = 0;
-  let snakeInterval = null;
-  let snakeScore = 0;
-  const canvas = document.getElementById('snake-canvas');
+  // 3. (REMOVED DUPLICATE)
+
+  // 4. DISCUSSION BOARD CREATOR
+  const btnToggleDiscussion = document.getElementById('btn-toggle-discussion');
+  const discussionCreator = document.getElementById('discussion-creator');
+  const btnCreateDiscussion = document.getElementById('btn-create-discussion');
+  const discussionResult = document.getElementById('discussion-result');
+  const btnNewDiscussion = document.getElementById('btn-new-discussion');
+
+  btnToggleDiscussion?.addEventListener('click', () => {
+    discussionCreator.classList.toggle('hidden');
+    btnToggleDiscussion.querySelector('svg').style.transform = discussionCreator.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(45deg)';
+    discussionCreator.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  btnCreateDiscussion?.addEventListener('click', async () => {
+    const title = document.getElementById('discussion-title').value.trim();
+    const content = document.getElementById('discussion-content').value.trim();
+
+    if (!title || !content) {
+      showStatus("Vui lòng nhập đầy đủ tiêu đề và nội dung!", "error");
+      return;
+    }
+
+    btnCreateDiscussion.disabled = true;
+    btnCreateDiscussion.textContent = "ĐANG KHỞI TẠO...";
+
+    try {
+      const response = await callApi(`${API_BASE}/discussions`, 'POST', {
+        title: title,
+        studentContent: content,
+        authorName: document.getElementById('info-lecturer')?.textContent || "Giảng viên",
+        authorEmail: "" // Optional
+      });
+
+      if (response && response.success) {
+        const boardId = response.id;
+        const webUrl = `http://localhost:3000/discussion?id=${boardId}`; // Cấu trúc URL mẫu
+        
+        // Hiển thị kết quả
+        discussionCreator.classList.add('hidden');
+        discussionResult.classList.remove('hidden');
+        document.getElementById('discussion-link-text').textContent = webUrl;
+        
+        // Tạo QR Code
+        const qrContainer = document.getElementById('discussion-qr');
+        qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(webUrl)}" style="width: 110px; height: 110px;">`;
+
+        // Gắn sự kiện cho các nút hành động
+        document.getElementById('btn-copy-discussion').onclick = () => {
+          navigator.clipboard.writeText(webUrl);
+          showStatus("Đã copy link thảo luận!", "success");
+        };
+
+        document.getElementById('btn-send-discussion-chat').onclick = () => {
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]?.id) {
+              chrome.tabs.sendMessage(tabs[0].id, {
+                action: "send_to_chat",
+                text: `Mời các bạn tham gia thảo luận: ${title}\nLink: ${webUrl}`
+              });
+              showStatus("Đã gửi link vào khung chat!", "success");
+            }
+          });
+        };
+
+        document.getElementById('btn-view-discussion-web').onclick = () => {
+          window.open(webUrl, '_blank');
+        };
+
+        showStatus("Khởi tạo bảng thảo luận thành công!", "success");
+      }
+    } catch (err) {
+      showStatus("Lỗi khi tạo bảng: " + err.message, "error");
+    } finally {
+      btnCreateDiscussion.disabled = false;
+      btnCreateDiscussion.textContent = "TẠO BẢNG THẢO LUẬN";
+    }
+  });
+
+  btnNewDiscussion?.addEventListener('click', () => {
+    discussionResult.classList.add('hidden');
+    discussionCreator.classList.remove('hidden');
+    document.getElementById('discussion-title').value = "";
+    document.getElementById('discussion-content').value = "";
+  });
+
+  // 5. SNAKE GAME (Keep for fun)
+  const canvas = document.getElementById('snake-game');
   const ctx = canvas?.getContext('2d');
   const gridSize = 10;
+  let snake = [{ x: 10, y: 10 }];
+  let apple = { x: 5, y: 5 };
+  let dx = 1, dy = 0;
+  let snakeScore = 0;
+  let snakeInterval = null;
 
   function initSnake() {
-    stopSnake();
-    snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    snake = [{ x: 10, y: 10 }];
     dx = 1; dy = 0;
     snakeScore = 0;
     updateSnakeScore();
@@ -1380,8 +1490,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   function startSnake() {
     if (snakeInterval) return;
     snakeInterval = setInterval(moveSnake, 150);
-    document.getElementById('btn-start-snake').textContent = "Dừng";
-    document.getElementById('btn-start-snake').onclick = stopSnake;
+    const btn = document.getElementById('btn-start-snake');
+    if (btn) {
+        btn.textContent = "Dừng";
+        btn.onclick = stopSnake;
+    }
   }
 
   function stopSnake() {
@@ -1396,14 +1509,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function moveSnake() {
     const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-    
-    // Check collision
     if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20 || snake.some(s => s.x === head.x && s.y === head.y)) {
       alert("Game Over! Điểm của bạn: " + snakeScore);
       initSnake();
+      stopSnake();
       return;
     }
-
     snake.unshift(head);
     if (head.x === apple.x && head.y === apple.y) {
       snakeScore += 5;
@@ -1415,26 +1526,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     drawSnake();
   }
 
-  function placeApple() {
-    apple = {
-      x: Math.floor(Math.random() * 20),
-      y: Math.floor(Math.random() * 20)
-    };
-  }
+  function placeApple() { apple = { x: Math.floor(Math.random() * 20), y: Math.floor(Math.random() * 20) }; }
 
   function drawSnake() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw Apple
     ctx.fillStyle = "#ef4444";
     ctx.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize - 1, gridSize - 1);
-    
-    // Draw Snake
     ctx.fillStyle = "#059669";
-    snake.forEach(s => {
-      ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 1, gridSize - 1);
-    });
+    snake.forEach(s => ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 1, gridSize - 1));
   }
 
   function updateSnakeScore() {
@@ -1448,100 +1548,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === "ArrowDown" && dy === 0) { dx = 0; dy = 1; }
     if (e.key === "ArrowLeft" && dx === 0) { dx = -1; dy = 0; }
     if (e.key === "ArrowRight" && dx === 0) { dx = 1; dy = 0; }
-  });
-
-  // 4. DISCUSSION BOARD (Padlet Mini)
-  let boardSections = [];
-
-  async function initBoard() {
-    const topicsEl = document.getElementById('board-topics');
-    const selectEl = document.getElementById('board-target-section');
-    
-    if (!topicsEl) return;
-    topicsEl.innerHTML = '<p style="font-size: 11px; color: #64748b; text-align: center;">Đang tải thảo luận...</p>';
-    
-    try {
-      const result = await callApi(`${API_BASE}/discussions`);
-      if (result && result.length > 0) {
-        boardSections = result;
-        renderBoard();
-        
-        // Update select options
-        if (selectEl) {
-          selectEl.innerHTML = boardSections.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
-        }
-      } else {
-        topicsEl.innerHTML = '<p style="font-size: 11px; color: #64748b; text-align: center;">Chưa có chủ đề nào. Hãy tạo trên Web Dashboard.</p>';
-      }
-    } catch (err) {
-      topicsEl.innerHTML = `<p style="font-size: 11px; color: #dc2626; text-align: center;">Lỗi: ${err.message}</p>`;
-    }
-  }
-
-  function renderBoard() {
-    const topicsEl = document.getElementById('board-topics');
-    if (!topicsEl) return;
-    topicsEl.innerHTML = "";
-    
-    boardSections.forEach(section => {
-      const sectionDiv = document.createElement('div');
-      sectionDiv.style.cssText = "border: 1px solid #f1f5f9; border-radius: 10px; background: #f8fafc; padding: 10px; margin-bottom: 10px;";
-      
-      const title = document.createElement('h4');
-      title.style.cssText = "font-size: 10px; font-weight: 900; color: #be185d; text-transform: uppercase; margin: 0 0 8px 0; border-bottom: 1px solid #fbcfe8; padding-bottom: 4px;";
-      title.textContent = section.title;
-      sectionDiv.appendChild(title);
-      
-      const postsContainer = document.createElement('div');
-      postsContainer.style.cssText = "display: flex; flex-direction: column; gap: 6px;";
-      
-      const posts = section.posts || [];
-      if (posts.length === 0) {
-        postsContainer.innerHTML = '<p style="font-size: 9px; color: #94a3b8; font-style: italic;">Chưa có bài đăng nào.</p>';
-      } else {
-        // Show last 3 posts
-        [...posts].reverse().slice(0, 3).forEach(post => {
-          const postDiv = document.createElement('div');
-          postDiv.style.cssText = "background: white; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 11px; line-height: 1.4;";
-          postDiv.innerHTML = `
-            <div style="font-weight: bold; font-size: 9px; color: #475569; margin-bottom: 4px;">${post.author}</div>
-            <div style="color: #1e293b;">${post.content}</div>
-          `;
-          postsContainer.appendChild(postDiv);
-        });
-      }
-      
-      sectionDiv.appendChild(postsContainer);
-      topicsEl.appendChild(sectionDiv);
-    });
-  }
-
-  document.getElementById('btn-post-board')?.addEventListener('click', async () => {
-    const content = document.getElementById('board-new-post').value.trim();
-    const sectionId = document.getElementById('board-target-section').value;
-    const btn = document.getElementById('btn-post-board');
-
-    if (!content || !sectionId) return;
-
-    btn.disabled = true;
-    btn.textContent = "Đang gửi...";
-    
-    try {
-      await callApi(`${API_BASE}/discussions`, 'POST', {
-        sectionId: sectionId,
-        content: content,
-        author: "Giảng viên" 
-      });
-      
-      document.getElementById('board-new-post').value = "";
-      await initBoard(); // Refresh
-      showStatus("Đã đăng bài thảo luận thành công!", "success");
-    } catch (err) {
-      showStatus("Lỗi: " + err.message, "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Gửi bài";
-    }
   });
 
   document.getElementById('btn-start-snake')?.addEventListener('click', startSnake);

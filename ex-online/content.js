@@ -20,9 +20,12 @@ function safeSendMessage(msg) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "toggle_sidebar") { toggleSidebar(); sendResponse({ success: true }); }
+    if (request.action === "toggle_sidebar") { 
+        toggleSidebar(); 
+        sendResponse({ success: true }); 
+    }
     else if (request.action === "get_meeting_info") { 
-        getMeetingInfo().then(i => sendResponse({ success: true, ...i })); 
+        getMeetingInfo(request.expectedHost).then(i => sendResponse({ success: true, ...i })); 
         return true; 
     }
     else if (request.action === "send_to_chat") { 
@@ -42,7 +45,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 let isAutomating = false;
 
-async function getMeetingInfo() {
+async function getMeetingInfo(expectedHost) {
     if (isAutomating) return { success: false, msg: "Automating..." };
     
     try {
@@ -63,25 +66,17 @@ async function getMeetingInfo() {
         const isChatOpen = chatBtn && (chatBtn.getAttribute('aria-pressed') === 'true' || chatBtn.getAttribute('aria-expanded') === 'true');
         const isPeopleOpen = peopleBtn && (peopleBtn.getAttribute('aria-pressed') === 'true' || peopleBtn.getAttribute('aria-expanded') === 'true');
 
-        // KHÔNG TỰ ĐỘNG MỞ PANEL TRONG HEARTBEAT NỮA ĐỂ TRÁNH NHẤP NHÁY
-        // Chỉ quét dữ liệu nếu panel đã mở hoặc từ các ô video (tiles)
-
         let attendance = new Set();
         let host = "Chưa xác định";
         
         // 2. Lấy danh sách từ Panel (Nếu mở)
-        // Mở rộng selector cho panel vì Google Meet có thể đổi class
         const panel = document.querySelector('[role="complementary"], .gg669c, .dwS77c, .Bx797e');
         const listItems = panel ? panel.querySelectorAll('[role="listitem"], [data-participant-id]') : [];
         
-        console.log(`Scanning ${listItems.length} items in panel...`);
-
         if (listItems.length > 0) {
             listItems.forEach(item => {
                 let ariaLabel = item.getAttribute('aria-label') || "";
                 let itemText = item.innerText || "";
-                
-                // Tìm tên trong item
                 const nameEl = item.querySelector('[jsname="WpHeLc"], .V9499e, .zWfAib, span:not(:empty)');
                 let name = nameEl ? (nameEl.innerText || nameEl.textContent) : ariaLabel;
 
@@ -89,23 +84,18 @@ async function getMeetingInfo() {
                     let n = cleanName(name);
                     if (isValid(n)) {
                         attendance.add(n);
-                        
-                        // Xác định Host: Tìm nhãn trong text hoặc aria-label hoặc icon chiếc khiên
                         const hostIcon = item.querySelector('[jsname="U989Be"], .uS1pfe, path[d^="M12 1L3 5"], path[d^="M12 2"]');
                         const isHost = /Người tổ chức cuộc họp|Chủ trì|Meeting host|Organizer/i.test(itemText) || 
                                        /Người tổ chức cuộc họp|Chủ trì|Meeting host|Organizer/i.test(ariaLabel) ||
                                        !!hostIcon;
                         
-                        if (isHost) {
-                            host = n;
-                            console.log("-> Found Host:", host);
-                        }
+                        if (isHost) host = n;
                     }
                 }
             });
         }
 
-        // 3. Quét các ô Video (Tiles) - Luôn quét để bổ sung
+        // 3. Quét các ô Video (Tiles)
         const tiles = document.querySelectorAll('[data-participant-id]');
         tiles.forEach(tile => {
             const nameEl = tile.querySelector('span.notranslate, [jsname="WpHeLc"]');
@@ -113,7 +103,6 @@ async function getMeetingInfo() {
                 let n = cleanName(nameEl.innerText || nameEl.textContent);
                 if (isValid(n)) {
                     attendance.add(n);
-                    // Kiểm tra badge host trên tile
                     if (host === "Chưa xác định") {
                         const hostBadge = tile.querySelector('[jsname="U989Be"], .uS1pfe, [aria-label*="tổ chức"], [aria-label*="host"]');
                         if (hostBadge) host = n;
@@ -144,31 +133,61 @@ async function getMeetingInfo() {
             }
         }
 
-        // 5. Check "Bạn" có phải là host không (Dựa vào nút khóa bảo mật)
-        // 6. Kiểm tra xem "Bạn" có phải là Host không
-        // Quét kỹ hơn các dấu hiệu chỉ Host mới có (Nút khóa bảo mật, Nút tắt tiếng tất cả,...)
+        // 5. Xác định tên của chính mình
+        let myName = "Không rõ";
+        const youEl = Array.from(document.querySelectorAll('[role="listitem"], [data-participant-id], .zWfAib, .V9499e, .nvvOic')).find(el => {
+            const text = el.innerText || el.getAttribute('aria-label') || "";
+            return text.includes("(Bạn)") || text.includes("(You)") || text.includes("Bạn") || text.includes("You");
+        });
+        
+        if (youEl) {
+            const nameEl = youEl.querySelector('[jsname="WpHeLc"], .V9499e, .zWfAib, span:not(:empty)');
+            if (nameEl) {
+                myName = cleanName(nameEl.innerText || nameEl.textContent);
+            } else {
+                const text = youEl.innerText || youEl.getAttribute('aria-label') || "";
+                myName = cleanName(text.split('(')[0]);
+            }
+        }
+
+        if (myName === "Không rõ") {
+            const accountBtn = document.querySelector('[aria-label*="Google Account"], [title*="Google Account"], [aria-label*="Tài khoản Google"], [title*="Tài khoản Google"]');
+            if (accountBtn) {
+                const label = accountBtn.getAttribute('aria-label') || accountBtn.getAttribute('title');
+                const match = label.match(/Account: (.*?) \(|Tài khoản Google: (.*?) \(/i);
+                if (match) myName = cleanName(match[1] || match[2]);
+                else {
+                   const parts = label.split(':');
+                   if (parts.length > 1) myName = cleanName(parts[1].split('(')[0]);
+                }
+            }
+        }
+
         const hostControlsExists = !!(
             document.querySelector('[aria-label*="tổ chức"], [aria-label*="Host controls"], [jsname="S09e9c"]') ||
             document.querySelector('[data-tooltip*="tổ chức"], [data-tooltip*="Host controls"]') ||
             document.querySelector('button[aria-label*="Tắt tiếng tất cả"], button[aria-label*="Mute all"]')
         );
-        
-        const list = Array.from(attendance).sort();
-        
-        // Xác định tên của chính mình
-        let myName = "Không rõ";
-        const youEl = Array.from(document.querySelectorAll('[role="listitem"], [data-participant-id], .zWfAib, .V9499e')).find(el => {
-            const text = el.innerText || el.getAttribute('aria-label') || "";
-            return text.includes("(Bạn)") || text.includes("(You)");
-        });
-        
-        if (youEl) {
-            const nameEl = youEl.querySelector('[jsname="WpHeLc"], .V9499e, span:not(:empty)');
-            if (nameEl) myName = cleanName(nameEl.innerText || nameEl.textContent);
-        }
 
         const isHost = hostControlsExists || (host !== "Chưa xác định" && host === myName);
-        console.log("Permission check:", { hostControlsExists, host, myName, isHost });
+        
+        if (isHost && (host === "Chưa xác định" || !host) && myName !== "Không rõ") {
+            host = myName;
+        }
+
+        // CỐ GẮNG CUỐI CÙNG: Đối soát với expectedHost (Giảng viên trong lịch dạy)
+        if (host === "Chưa xác định" && expectedHost) {
+            const list = Array.from(attendance);
+            const found = list.find(name => namesMatch(name, expectedHost));
+            if (found) host = found;
+        }
+
+        // Nếu vẫn không thấy mà mình là Host thì chắc chắn là mình
+        if (host === "Chưa xác định" && isHost && expectedHost) {
+            host = expectedHost;
+        }
+
+        const list = Array.from(attendance).sort();
 
         return { 
             success: true,
@@ -185,6 +204,15 @@ async function getMeetingInfo() {
     }
 }
 
+function namesMatch(n1, n2) {
+    if (!n1 || !n2) return false;
+    const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    const s1 = norm(n1);
+    const s2 = norm(n2);
+    return s1.includes(s2) || s2.includes(s1);
+}
+
+// Utility functions
 function cleanName(n) {
     if (!n) return "";
     // Xử lý chuỗi thô từ Meet (Ví dụ: "Nguyễn Văn A, Người tổ chức" hoặc "Nguyễn Văn A (Bạn)")

@@ -13,7 +13,7 @@ export const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyBXjBBAnT-qIchTelWU6YWAvzXmkEgMBBw",
   authDomain: "kiemtranoibo-ccks.firebaseapp.com",
   projectId: "kiemtranoibo-ccks",
-  storageBucket: "kiemtranoibo-ccks.appspot.com",
+  storageBucket: "kiemtranoibo-ccks.firebasestorage.app",
   messagingSenderId: "860631528951",
   appId: "1:860631528951:web:88b80d83f147a58d8b6af2",
   measurementId: "G-F7N2SW7HGG"

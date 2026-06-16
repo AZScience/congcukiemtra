@@ -43,3 +43,13 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+# Backups and Uploads
+public/backups/
+public/uploads/
+
+# Temp scripts
+*.mjs
+!next.config.mjs
+*firebase-adminsdk*.json
+find-cols.js
+list_buckets.js

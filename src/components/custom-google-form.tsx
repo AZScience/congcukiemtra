@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +9,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Loader2, FileCheck, CheckCircle2, UploadCloud, X } from "lucide-react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useStorage, useFirestore } from "@/firebase";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, doc, getDoc } from "firebase/firestore";
 import { useUser } from "@/firebase";
 import { useMasterData } from "@/providers/master-data-provider";
-import { uploadToGoogleDrive } from "@/ai/flows/google-drive-upload";
 import { pushFeedbackToGoogleSheet } from "@/ai/flows/google-sheet-export";
+import { uploadToCatboxServer } from "@/ai/flows/catbox-upload";
+import { uploadToFirebaseServer } from "@/ai/flows/firebase-upload";
 
 export function CustomGoogleForm() {
   const { toast } = useToast();
@@ -43,115 +48,138 @@ export function CustomGoogleForm() {
     }
   }, [authUser, employees]);
 
-  // Trạng thái các file đính kèm
+  // Trạng thái các file đính kèm (HỖ TRỢ NHIỀU FILE)
   const [files, setFiles] = useState<{
-    proofPrinted: File | null;
-    proofOnline: File | null;
-    proofIncident: File | null;
-    proofFacility: File | null;
+    proofPrinted: File[];
+    proofOnline: File[];
+    proofIncident: File[];
+    proofFacility: File[];
   }>({
-    proofPrinted: null,
-    proofOnline: null,
-    proofIncident: null,
-    proofFacility: null
+    proofPrinted: [],
+    proofOnline: [],
+    proofIncident: [],
+    proofFacility: []
   });
 
   const handleFileChange = (field: keyof typeof files, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFiles(prev => ({ ...prev, [field]: e.target.files![0] }));
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setFiles(prev => ({ ...prev, [field]: [...prev[field], ...newFiles] }));
     }
+    e.target.value = ''; // Reset để chọn lại cùng file nếu cần
   };
 
-  const removeFile = (field: keyof typeof files) => {
-    setFiles(prev => ({ ...prev, [field]: null }));
+  const removeFile = (field: keyof typeof files, index: number) => {
+    setFiles(prev => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index)
+    }));
   };
 
-  const uploadSingleFile = async (file: File | null, folderId: string, email: string, key: string) => {
-    if (!file) return "";
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('folderId', folderId);
-    fd.append('serviceAccountEmail', email);
-    fd.append('privateKey', key);
+  const uploadMultipleFiles = async (fileList: File[]) => {
+    if (fileList.length === 0) return "";
     
-    const res = await uploadToGoogleDrive(fd);
-    if (!res.success) throw new Error(`Lỗi tải lên ${file.name}: ${res.error}`);
-    return res.url;
+    const urls: string[] = [];
+    
+    for (const file of fileList) {
+      const formData = new FormData();
+      formData.append("reqtype", "fileupload");
+      formData.append("fileToUpload", file);
+      
+      try {
+        // Sử dụng một Proxy để tránh lỗi CORS nếu chạy trực tiếp từ browser
+        // Hoặc chúng ta có thể gọi qua một server action nếu cần.
+        // Ở đây tôi sẽ dùng hướng xử lý qua Server Action để đảm bảo 100% thành công.
+        const res = await uploadToCatboxServer(formData);
+        if (res.success && res.url) {
+          urls.push(res.url);
+        } else {
+          throw new Error(res.error || "Lỗi tải ảnh lên hệ thống.");
+        }
+      } catch (err: any) {
+        throw new Error(`Lỗi tải tệp "${file.name}": ${err.message}`);
+      }
+    }
+    return urls.join('\n');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const email = sysParams?.googleServiceAccountEmail;
-    const key = sysParams?.googlePrivateKey;
-    const sheetId = sysParams?.googleSheetId;
+    const email = sysParams?.evidenceServiceAccountEmail || sysParams?.googleServiceAccountEmail;
+    const key = sysParams?.evidencePrivateKey || sysParams?.googlePrivateKey;
+    const sheetId = sysParams?.feedbackSheetId || sysParams?.googleSheetId;
     // BẠN CẦN NHẬP ID THƯ MỤC GOOGLE DRIVE VÀO ĐÂY HOẶC VÀO SYSTEM PARAMETERS
 
     if (!email || !key || !sheetId) {
       toast({
         title: "Thiếu cấu hình",
-        description: "Vui lòng vào mục Tham số hệ thống để điền Email và Private Key của Service Account.",
+        description: "Vui lòng vào mục Tham số hệ thống để điền cấu hình Google cho mục Minh chứng.",
         variant: "destructive"
       });
       return;
     }
 
-    const driveFolderId = sysParams?.googleDriveFolderId;
-      
-    if (!driveFolderId || driveFolderId === "NHẬP_ID_THƯ_MỤC_DRIVE_CỦA_BẠN_VÀO_ĐÂY") {
-      toast({ title: "Chưa cấu hình Thư mục Drive", description: "Vui lòng vào trang Tham số hệ thống để điền ID thư mục Google Drive.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
-    }
-
     setIsSubmitting(true);
-    toast({ title: "Đang tải tệp lên Google Drive..." });
+    toast({ title: "Đang tải các tệp minh chứng..." });
 
     try {
-      // 1. Upload các file lên Drive và lấy Link
-      const printedUrl = await uploadSingleFile(files.proofPrinted, driveFolderId, email, key);
-      const onlineUrl = await uploadSingleFile(files.proofOnline, driveFolderId, email, key);
-      const incidentUrl = await uploadSingleFile(files.proofIncident, driveFolderId, email, key);
-      const facilityUrl = await uploadSingleFile(files.proofFacility, driveFolderId, email, key);
+      // 1. Upload các nhóm file lên ImgBB (Nhanh và ổn định nhất)
+      const printedUrl = await uploadMultipleFiles(files.proofPrinted);
+      const onlineUrl = await uploadMultipleFiles(files.proofOnline);
+      const incidentUrl = await uploadMultipleFiles(files.proofIncident);
+      const facilityUrl = await uploadMultipleFiles(files.proofFacility);
 
-      toast({ title: "Tải tệp thành công, đang ghi vào Sheet..." });
+      // Log để người dùng biết kết quả lấy link
+      toast({ 
+        title: "Kết quả lấy link ảnh", 
+        description: `Tờ in: ${files.proofPrinted.length} ảnh, Online: ${files.proofOnline.length} ảnh, Sự cố: ${files.proofIncident.length} ảnh, CSVC: ${files.proofFacility.length} ảnh.`,
+      });
+
+      toast({ title: "Đang ghi vào Sheet..." });
 
       // 2. Chuẩn bị dữ liệu ghi vào Google Sheet
       const now = new Date();
-      const timestamp = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      const timestamp = format(now, 'dd/MM/yyyy HH:mm:ss');
 
       const dataToPush = [{
         timestamp: timestamp,
-        email: formData.email,
-        employeeName: formData.employeeName,
-        date: formData.date.split('-').reverse().join('/'), // Convert YYYY-MM-DD to DD/MM/YYYY
-        proofPrinted: printedUrl || "",
-        proofOnline: onlineUrl || "",
-        proofIncident: incidentUrl || "",
-        proofFacility: facilityUrl || ""
+        email: formData.email || authUser?.email || "",
+        employeeName: formData.employeeName || authUser?.displayName || "Cán bộ kiểm tra",
+        date: formData.date || format(now, 'yyyy-MM-dd'),
+        proofPrinted: printedUrl,
+        proofOnline: onlineUrl,
+        proofIncident: incidentUrl,
+        proofFacility: facilityUrl
       }];
 
+      toast({ title: "Tải ảnh xong, đang ghi vào Google Sheet..." });
+
       // Đẩy lên Google Sheet
-      const targetSheetId = "1X1SVdKrM2GlKxTcPdb7hqfzJNx3zIhfUhb_36qP7ghU";
-      
-      await pushFeedbackToGoogleSheet(
+      const finalTabName = sysParams?.feedbackTabName || "Trang tính1";
+
+      const sheetRes = await pushFeedbackToGoogleSheet(
         dataToPush,
-        targetSheetId,
+        sheetId,
         email,
         key,
-        "Biểu mẫu 1" // Thay bằng tên Tab thực tế trên Sheet của bạn (Thường là Form Responses 1 hoặc Biểu mẫu 1)
+        finalTabName
       );
+
+      if (!sheetRes.success) {
+        throw new Error(sheetRes.message || "Lỗi khi ghi vào Google Sheet.");
+      }
 
       toast({
         title: "Gửi báo cáo thành công!",
-        description: "Thông tin và tệp đính kèm đã được đẩy lên Google Drive & Sheet.",
+        description: `Dữ liệu đã được ghi vào Sheet: ${sheetRes.message}`,
       });
       
       setIsSuccess(true);
       setTimeout(() => {
         setIsSuccess(false);
-        setFormData({ email: "", employeeName: "", date: new Date().toISOString().split('T')[0] });
-        setFiles({ proofPrinted: null, proofOnline: null, proofIncident: null, proofFacility: null });
+        setFormData(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+        setFiles({ proofPrinted: [], proofOnline: [], proofIncident: [], proofFacility: [] });
       }, 3000);
       
     } catch (error: any) {
@@ -235,28 +263,41 @@ export function CustomGoogleForm() {
               <div key={field.id} className="bg-gray-50 p-4 rounded-lg border">
                 <Label className="font-semibold text-gray-700 text-base block mb-3">{field.label}</Label>
                 
-                {files[field.id as keyof typeof files] ? (
-                   <div className="flex items-center gap-3 bg-blue-50 text-blue-700 p-3 rounded-md border border-blue-200 w-max">
-                     <FileCheck size={18} />
-                     <span className="text-sm font-medium">{files[field.id as keyof typeof files]?.name}</span>
-                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6 ml-2 hover:bg-blue-200" onClick={() => removeFile(field.id as keyof typeof files)}>
+                <div>
+                  <input 
+                    type="file" 
+                    id={field.id}
+                    multiple
+                    className="hidden" 
+                    onChange={(e) => handleFileChange(field.id as keyof typeof files, e)}
+                    accept="image/*"
+                  />
+                  <Label htmlFor={field.id} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-blue-600 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <UploadCloud size={18} />
+                    Thêm tệp
+                  </Label>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {files[field.id as keyof typeof files].map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-blue-50 text-blue-700 p-2 px-3 rounded-md border border-blue-200">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileCheck size={16} className="flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{file.name}</span>
+                        <span className="text-[10px] text-blue-400">({(file.size/1024).toFixed(0)} KB)</span>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 hover:bg-blue-200 text-blue-600" 
+                        onClick={() => removeFile(field.id as keyof typeof files, idx)}
+                      >
                         <X size={14} />
-                     </Button>
-                   </div>
-                ) : (
-                  <div>
-                    <input 
-                      type="file" 
-                      id={field.id}
-                      className="hidden" 
-                      onChange={(e) => handleFileChange(field.id as keyof typeof files, e)}
-                    />
-                    <Label htmlFor={field.id} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-blue-600 cursor-pointer hover:bg-gray-50 transition-colors">
-                      <UploadCloud size={18} />
-                      Thêm tệp
-                    </Label>
-                  </div>
-                )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
 

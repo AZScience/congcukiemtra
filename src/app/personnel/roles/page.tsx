@@ -16,7 +16,7 @@ import {
   PlusCircle, Trash2, Edit, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, Copy, ArrowUpDown, ArrowUp, 
   ArrowDown, Filter, X, EllipsisVertical, Save, Shield, 
-  Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter,
+  Undo2, Ban, Eye, FileDown, FileUp, CheckCircle2, ListFilter, ChevronDown,
   StickyNote
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,9 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import * as XLSX from 'xlsx';
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Role } from '@/lib/types';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderRole extends Role { renderId: string; }
@@ -81,12 +83,36 @@ const ColumnHeader = ({ columnKey, title, t, sortConfig, openPopover, setOpenPop
 
 const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t }: any) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader><DialogTitle>Bộ lọc nâng cao</DialogTitle><VisuallyHidden><DialogDescription>Lọc danh sách vai trò</DialogDescription></VisuallyHidden></DialogHeader>
-            <div className="grid gap-4 p-4">
-                <div className="space-y-2"><Label className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> {t('Tên vai trò')}</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/30">
+                <div className="flex items-center gap-3">
+                    <ListFilter className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                        <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button><Button onClick={() => onOpenChange(false)}>Áp dụng</Button></DialogFooter>
+
+            <VisuallyHidden><DialogDescription>Lọc danh sách vai trò</DialogDescription></VisuallyHidden>
+
+            <ScrollArea className="max-h-[70vh]">
+                <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> {t('Tên vai trò')}</Label>
+                        <Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." />
+                    </div>
+                </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <X className="mr-2 h-4 w-4" /> Xóa tất cả
+                </Button>
+                <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng bộ lọc
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 );
@@ -116,6 +142,7 @@ export default function RolesPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const collectionRef = useMemo(() => (firestore ? collection(firestore, 'roles') : null), [firestore]);
     const { data: rawRoles, loading } = useCollection<Role>(collectionRef);
+    const { permissions } = usePermissions('/personnel/roles');
     const data = useMemo(() => (rawRoles || []).map((item, idx) => ({ ...item, renderId: `${item.id || 'no-id'}-${idx}` })) as RenderRole[], [rawRoles]);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -225,9 +252,18 @@ export default function RolesPage() {
                                 <div className="flex items-center gap-2">
                                     <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                                     <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    
+                                    {permissions.import && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.export && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                                    )}
+                                    
+                                    {permissions.add && (
+                                        <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                                    )}
                                 </div>
                             </div>
                         </CardHeader>
@@ -242,43 +278,71 @@ export default function RolesPage() {
                                                     <ColumnHeader columnKey={k} title={columnDefs[k]} t={t} sortConfig={sortConfig} openPopover={openPopover} setOpenPopover={setOpenPopover} requestSort={(k:any,d:any)=>setSortConfig([{key:k,direction:d}])} clearSort={() => setSortConfig([])} filters={filters} handleFilterChange={(k:any,v:any)=>{setFilters((p:any)=>({...p,[k]:v})); setCurrentPage(1);}} />
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="w-16 text-center text-white font-bold text-base">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-                                                                <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
-                                                                <DropdownMenuSeparator />
-                                                                {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [k]: !!v}))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent><p>{t('Cài đặt hiển thị')}</p></TooltipContent>
-                                                </Tooltip>
+                                            <TableHead className="w-16 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-300 p-0 text-center">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                                                        <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [k]: !!v}))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                                        {loading ? (
+                                            <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow>
+                                        ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                                             const isSelected = selectedSet.has(item.renderId);
                                             return (
-                                                <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/20 hover:bg-yellow-300 transition-all", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
-                                                    <TableCell className="text-center border-r text-inherit align-middle py-3">{startIndex + idx + 1}</TableCell>
-                                                    {orderedColumns.map(k => <TableCell key={k} className="border-r text-inherit align-middle py-3">{String(item[k as keyof Role] || '')}</TableCell>)}
-                                                    <TableCell className="text-center py-3 text-inherit align-middle">
-                                                        <div onClick={e => e.stopPropagation()}>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={item.name === 'Hệ thống'} className="text-primary hover:bg-muted"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent><p>{t('Thao tác')}</p></TooltipContent>
-                                                            </Tooltip>
-                                                        </div>
+                                                <TableRow 
+                                                    key={item.renderId} 
+                                                    onClick={() => handleRowClick(item.renderId)}
+                                                    data-state={isSelected ? "selected" : ""}
+                                                    className={cn(
+                                                        "cursor-pointer transition-colors hover:bg-slate-50",
+                                                        isSelected && "bg-blue-50/50"
+                                                    )}
+                                                >
+                                                    <TableCell className="text-center font-medium text-slate-600 border-r">{startIndex + idx + 1}</TableCell>
+                                                    {orderedColumns.map(columnKey => (
+                                                        <TableCell key={columnKey} className="border-r max-w-[300px]">
+                                                            {columnKey === 'name' ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                                                        <Shield className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-800">{item.name}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-600 line-clamp-2">{(item as any)[columnKey] || '---'}</span>
+                                                            )}
+                                                        </TableCell>
+                                                    ))}
+                                                    <TableCell className="sticky right-0 z-10 bg-white/80 backdrop-blur-sm shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l p-0 text-center">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"><EllipsisVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('view', item); }}><Eye className="mr-2 h-4 w-4" /> Xem chi tiết</DropdownMenuItem>
+                                                                {permissions.edit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('edit', item); }}><Edit className="mr-2 h-4 w-4" /> Chỉnh sửa</DropdownMenuItem>}
+                                                                {permissions.add && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDialog('copy', item); }}><Copy className="mr-2 h-4 w-4" /> Nhân bản</DropdownMenuItem>}
+                                                                {permissions.delete && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setIsDeleteDialogOpen(true); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Xoá</DropdownMenuItem>}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </TableCell>
                                                 </TableRow>
                                             );
-                                        }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                                        }) : (
+                                            <DataTableEmptyState 
+                                                colSpan={orderedColumns.length + 2} 
+                                                icon={Shield}
+                                                title={t('Không tìm thấy vai trò')}
+                                                filters={filters}
+                                                onClearFilters={() => setFilters({})}
+                                            />
+                                        )}
+
                                     </TableBody>
                                 </Table>
                             </div>

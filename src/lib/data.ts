@@ -52,15 +52,21 @@ export const classrooms: Classroom[] = [
     { id: 'L.101', name: 'L.101', buildingBlockId: 'block-l', seatingCapacity: 80, tableCount: 40, examCapacity: 40, roomType: 'Lý thuyết', hasProjector: true, isInactive: false, note: '' }
 ];
 
+import { STAFF_PERMISSIONS, CONTROLLER_PERMISSIONS } from './permissions-defaults';
+
 export const roles: Role[] = [
   { id: 'system', name: 'Hệ thống', note: 'Quản trị viên cao nhất, có tất cả các quyền.', permissions: {} },
-  { id: 'staff', name: 'Nhân viên', note: 'Nhân viên phòng ban, quyền hạn giới hạn.', permissions: {} },
+  { id: 'controller', name: 'Kiểm soát viên', note: 'Kiểm soát viên phòng ban, có quyền ghi nhận và xem báo cáo.', permissions: CONTROLLER_PERMISSIONS },
+  { id: 'staff', name: 'Nhân viên', note: 'Nhân viên phòng ban, quyền hạn giới hạn ghi nhận.', permissions: STAFF_PERMISSIONS },
 ];
+
 
 export const employees: Employee[] = [
   { id: 'NTT-02715-UID', employeeId: 'NTT-02715', name: 'Nguyễn Vĩnh Phúc', nickname: 'Phúc', position: 'Chuyên viên', birthDate: '15/07/1992', address: 'Quận 12, TP.HCM', phone: '0987654321', role: 'Hệ thống', email: 'vinhphuc@ntt.edu.vn', avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=500&h=500&fit=crop' },
   { id: 'NTT-01234-UID', employeeId: 'NTT-01234', name: 'Trần Thị B', nickname: 'B', position: 'Chuyên viên', birthDate: '20/11/1995', address: 'Quận 1, TP.HCM', phone: '0912345678', role: 'Nhân viên', email: 'b.tt@ntt.edu.vn', avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop' },
+  { id: 'K4pEteCqGtWKVuVfVo3KC0SAuv72', employeeId: 'NTT-09999', name: 'Đặng Ngọc Phương', nickname: 'Phương', position: 'Nhân viên', birthDate: '01/01/1990', address: 'TP.HCM', phone: '0900000000', role: 'Nhân viên', email: 'dnphuong@ntt.edu.vn' },
 ];
+
 
 export const sentMessages: Message[] = [];
 export const deletedMessages: Message[] = [];

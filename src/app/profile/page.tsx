@@ -25,11 +25,13 @@ import {
     DialogContent, 
     DialogHeader, 
     DialogTitle, 
+    DialogDescription,
     DialogFooter,
     DialogTrigger
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { DatePickerField } from "@/components/ui/date-picker-field";
+import { AvatarInput } from "@/components/personnel/avatar-input";
 
 export default function ProfilePage() {
     const { t } = useLanguage();
@@ -161,49 +163,45 @@ export default function ProfilePage() {
                     <div className="lg:col-span-1 space-y-6">
                         <Card className="shadow-sm border-t-4 border-t-primary overflow-hidden">
                             <CardContent className="pt-8 flex flex-col items-center">
-                                <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <div className="relative group cursor-pointer mb-6 transition-transform hover:scale-105">
-                                            <Avatar className="h-32 w-32 border-4 border-background shadow-2xl">
-                                                <AvatarImage src={form.avatarUrl} />
-                                                <AvatarFallback className="text-4xl bg-primary/10 text-primary">
-                                                    {employee.name.charAt(0)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                <Camera className="text-white h-8 w-8" />
-                                            </div>
-                                        </div>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>{t('Cập nhật Ảnh đại diện')}</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="py-4 space-y-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-semibold">{t('Đường dẫn ảnh (URL)')}</label>
-                                                <Input 
-                                                    value={form.avatarUrl} 
-                                                    onChange={(e) => setForm({...form, avatarUrl: e.target.value})}
-                                                    placeholder="https://example.com/photo.jpg"
-                                                />
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    {t('* Hiện tại hệ thống hỗ trợ cập nhật ảnh qua đường dẫn trực tiếp.')}
-                                                </p>
-                                            </div>
-                                            <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-                                                <Avatar className="h-24 w-24">
-                                                    <AvatarImage src={form.avatarUrl} />
-                                                    <AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="ghost" onClick={() => setIsAvatarDialogOpen(false)}>{t('Hủy')}</Button>
-                                            <Button onClick={handleSave} disabled={isSaving}>{t('Cập nhật')}</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+                                        <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+                                            <DialogTrigger asChild>
+                                                <div className="relative group cursor-pointer mb-6 transition-transform hover:scale-105">
+                                                    <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-2 ring-primary/5">
+                                                        {form.avatarUrl && form.avatarUrl.trim() !== "" ? (
+                                                            <AvatarImage src={form.avatarUrl} className="object-cover" />
+                                                        ) : null}
+                                                        <AvatarFallback className="text-4xl bg-primary/10 text-primary">
+                                                            {employee.name.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                        <Camera className="text-white h-8 w-8" />
+                                                    </div>
+                                                </div>
+                                            </DialogTrigger>
+                                            <DialogContent className="sm:max-w-xl">
+                                                <DialogHeader>
+                                                    <DialogTitle>{t('Cập nhật Ảnh đại diện')}</DialogTitle>
+                                                    <DialogDescription>
+                                                        {t('Sử dụng liên kết, tải tệp từ máy tính hoặc chụp ảnh trực tiếp.')}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="py-2">
+                                                    <AvatarInput 
+                                                        value={form.avatarUrl} 
+                                                        onChange={(val) => setForm({...form, avatarUrl: val})}
+                                                        name={employee.name}
+                                                    />
+                                                </div>
+                                                <DialogFooter className="pt-4 border-t">
+                                                    <Button variant="ghost" onClick={() => setIsAvatarDialogOpen(false)}>{t('Hủy')}</Button>
+                                                    <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                                                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                                        {t('Lưu thay đổi')}
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
 
                                 <h2 className="text-xl font-bold text-center px-2" suppressHydrationWarning>{employee.name}</h2>
                                 <p className="text-sm text-muted-foreground mb-4" suppressHydrationWarning>

@@ -3,11 +3,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
-const getDb = async () => {
-    const apps = getApps();
-    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-    return getFirestore(app);
-};
+import { db } from '@/lib/firebase';
+const getDb = async () => db;
 
 export async function OPTIONS() {
     return new Response(null, {

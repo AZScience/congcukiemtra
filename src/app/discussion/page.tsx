@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '@/lib/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -47,7 +47,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
-import { useUser } from '@/firebase';
+// Removed legacy useUser import as it is now combined above
 import { useMasterData } from '@/providers/master-data-provider';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/rich-text-editor';
@@ -73,6 +73,7 @@ interface Section {
 }
 
 export default function DiscussionPage() {
+  const firestore = useFirestore();
   const { user } = useUser();
   const { lecturers, employees } = useMasterData();
   const [sections, setSections] = useState<Section[]>([]);
@@ -87,7 +88,7 @@ export default function DiscussionPage() {
   const [searchDate, setSearchDate] = useState<string>('');
 
   useEffect(() => {
-    const q = query(collection(db, 'discussion_sections'), orderBy('createdAt', 'desc'));
+    const q = query(collection(firestore, 'discussion_sections'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const sectionsData: Section[] = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -113,7 +114,7 @@ export default function DiscussionPage() {
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
     try {
-      await addDoc(collection(db, 'discussion_sections'), {
+      await addDoc(collection(firestore, 'discussion_sections'), {
         title: newSectionTitle,
         studentContent: newSectionStudentContent,
         lecturerContent: '',
@@ -137,7 +138,7 @@ export default function DiscussionPage() {
   const handleUpdateSectionField = async (sectionId: string, field: 'studentContent') => {
     if (!activeEditingField || activeEditingField.id !== sectionId) return;
     try {
-      const sectionRef = doc(db, 'discussion_sections', sectionId);
+      const sectionRef = doc(firestore, 'discussion_sections', sectionId);
       await updateDoc(sectionRef, { [field]: activeEditingField.content });
       setActiveEditingField(null);
       toast({ title: "Đã cập nhật nội dung thành công" });
@@ -149,7 +150,7 @@ export default function DiscussionPage() {
   const handleAddComment = async (sectionId: string) => {
     if (!newCommentText.trim()) return;
     try {
-      const sectionRef = doc(db, 'discussion_sections', sectionId);
+      const sectionRef = doc(firestore, 'discussion_sections', sectionId);
       const newComment = {
         id: Math.random().toString(36).substring(7),
         text: newCommentText,
@@ -171,7 +172,7 @@ export default function DiscussionPage() {
   const handleDeleteComment = async (sectionId: string, commentId: string) => {
     if (!confirm('Xóa nhận xét này?')) return;
     try {
-      const sectionRef = doc(db, 'discussion_sections', sectionId);
+      const sectionRef = doc(firestore, 'discussion_sections', sectionId);
       const sectionSnap = await getDoc(sectionRef);
       if (sectionSnap.exists()) {
         const comments = sectionSnap.data().comments || [];
@@ -187,7 +188,7 @@ export default function DiscussionPage() {
   const handleUpdateSectionTitle = async (sectionId: string) => {
     if (!editSectionTitle.trim()) return;
     try {
-      const sectionRef = doc(db, 'discussion_sections', sectionId);
+      const sectionRef = doc(firestore, 'discussion_sections', sectionId);
       await updateDoc(sectionRef, { title: editSectionTitle });
       setEditingSectionId(null);
       setEditSectionTitle('');
@@ -290,7 +291,7 @@ export default function DiscussionPage() {
                           <Button 
                             size="sm" 
                             onClick={async () => {
-                              await updateDoc(doc(db, 'discussion_sections', section.id), { title: editSectionTitle });
+                              await updateDoc(doc(firestore, 'discussion_sections', section.id), { title: editSectionTitle });
                               setEditingSectionId(null);
                               toast({ title: "Đã cập nhật tiêu đề" });
                             }}
@@ -457,7 +458,7 @@ export default function DiscussionPage() {
                       <button 
                         onClick={async () => {
                           if (confirm('Bạn có chắc chắn muốn xóa bảng thảo luận này không?')) {
-                            await deleteDoc(doc(db, 'discussion_sections', section.id));
+                            await deleteDoc(doc(firestore, 'discussion_sections', section.id));
                             toast({ title: "Đã xóa bảng thảo luận thành công" });
                           }
                         }}

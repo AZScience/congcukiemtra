@@ -59,7 +59,9 @@ export function UserNav() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-primary/20 hover:border-primary/50 transition-all p-0">
               <Avatar className="h-9 w-9">
-                <AvatarImage src={employee?.avatarUrl} />
+                {employee?.avatarUrl && employee.avatarUrl.trim() !== "" ? (
+                  <AvatarImage src={employee.avatarUrl} className="object-cover" />
+                ) : null}
                 <AvatarFallback className="bg-primary/10 text-primary font-bold">
                   {employee?.name ? employee.name.charAt(0) : <UserCircle className="h-6 w-6" />}
                 </AvatarFallback>

@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { onSnapshot, type Query, type CollectionReference } from 'firebase/firestore';
+import { onSnapshot, queryEqual, type Query, type CollectionReference } from 'firebase/firestore';
+
+function isQueryEqual(a: Query | CollectionReference | null, b: Query | CollectionReference | null) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return queryEqual(a as Query, b as Query);
+  } catch (e) {
+    return false;
+  }
+}
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '../errors';
 import { toast } from '@/hooks/use-toast';
@@ -14,32 +24,42 @@ export function useCollection<T extends { id: string }>(ref: Query | CollectionR
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const lastRefPath = useRef<string | null>(null);
   const retryCount = useRef(0);
+  const memoizedRef = useRef<Query | CollectionReference | null>(null);
+
+  if (!isQueryEqual(ref, memoizedRef.current)) {
+    memoizedRef.current = ref;
+  }
 
   useEffect(() => {
     let isMounted = true;
+    const currentRef = memoizedRef.current;
 
-    if (!ref) {
+    if (!currentRef) {
       setData([]);
       setLoading(false);
       return;
     }
 
-    const currentPath = (ref as any).path || (ref as any)._query?.path?.segments?.join('/') || 'unknown';
+    const currentPath = (currentRef as any).path || (currentRef as any)._query?.path?.segments?.join('/') || 'unknown';
     
     if (currentPath !== lastRefPath.current) {
       lastRefPath.current = currentPath;
-      retryCount.current = 0; // Reset retry count khi đổi collection khác
+      retryCount.current = 0;
     }
     setLoading(true);
 
     const unsubscribe = onSnapshot(
-      ref,
+      currentRef,
+      { includeMetadataChanges: true },
       (snapshot) => {
         if (!isMounted) return;
-        retryCount.current = 0; // Thành công → reset retry
+        retryCount.current = 0;
+        setIsOffline(snapshot.metadata.fromCache);
+        
         try {
           const result: T[] = [];
           snapshot.forEach((doc) => {
@@ -56,9 +76,10 @@ export function useCollection<T extends { id: string }>(ref: Query | CollectionR
       },
       async (serverError: any) => {
         if (!isMounted) return;
-
+        setLoading(false);
+        
         if (serverError.code === 'permission-denied') {
-          const path = (ref as any).path || 'collection';
+          const path = (currentRef as any).path || 'collection';
           const permissionError = new FirestorePermissionError({
             path: path,
             operation: 'list',
@@ -67,13 +88,11 @@ export function useCollection<T extends { id: string }>(ref: Query | CollectionR
           errorEmitter.emit('permission-error', permissionError);
           setError(permissionError);
 
-          // Auto-retry với exponential backoff — chỉ hoạt động vì retryKey có trong deps
           if (retryCount.current < MAX_RETRIES) {
             retryCount.current++;
             const delay = Math.min(3000 * retryCount.current, 15000);
             setTimeout(() => {
-              if (!isMounted) return;
-              setRetryKey(k => k + 1); // ← Thay đổi dep → useEffect chạy lại → listener mới
+              if (isMounted) setRetryKey(k => k + 1);
             }, delay);
           }
         } else if (serverError.code === 'resource-exhausted') {
@@ -82,7 +101,7 @@ export function useCollection<T extends { id: string }>(ref: Query | CollectionR
             toast({
               variant: "destructive",
               title: "Hết hạn mức dữ liệu (Quota Exceeded)",
-              description: "Hệ thống đã đạt giới hạn truy vấn miễn phí của Firebase. Hạn mức sẽ được reset sau 24h.",
+              description: "Hệ thống đã đạt giới hạn truy vấn miễn phí của Firebase.",
             });
             lastQuotaToastTime = now;
           }
@@ -90,17 +109,14 @@ export function useCollection<T extends { id: string }>(ref: Query | CollectionR
         } else {
           setError(serverError);
         }
-        setLoading(false);
       }
     );
 
     return () => {
       isMounted = false;
-      try {
-        unsubscribe();
-      } catch (e) {}
+      try { unsubscribe(); } catch (e) {}
     };
-  }, [ref, retryKey]); // retryKey trong deps → setRetryKey() triggers listener mới thực sự
+  }, [memoizedRef.current, retryKey]);
 
-  return { data, loading, error };
+  return { data, loading, error, isOffline };
 }

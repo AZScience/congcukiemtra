@@ -4,6 +4,7 @@ import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/fire
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 
+import { db } from '@/lib/firebase';
 const getDb = async () => {
     const apps = getApps();
     const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
@@ -17,7 +18,7 @@ const getDb = async () => {
         }
     }
     
-    return getFirestore(app);
+    return db;
 };
 
 export async function OPTIONS() {

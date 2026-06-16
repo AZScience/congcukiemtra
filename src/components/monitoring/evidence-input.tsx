@@ -2,46 +2,49 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Camera, 
-  Video, 
-  FileText, 
-  Link as LinkIcon, 
-  X, 
-  Upload, 
-  Image as LucideImage, 
-  Monitor, 
-  User, 
-  Circle, 
-  StopCircle, 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  Camera,
+  Video,
+  FileText,
+  Link as LinkIcon,
+  X,
+  Upload,
+  Image as LucideImage,
+  Monitor,
+  User,
+  Circle,
+  StopCircle,
   RefreshCw,
   Eye,
   Download,
   ExternalLink,
   CheckCircle2,
+  Loader2,
+  Plus,
 } from 'lucide-react';
+import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface EvidenceInputProps {
   value: string;
@@ -55,6 +58,7 @@ type SourceType = 'camera' | 'screen';
 export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProps) {
   const [items, setItems] = useState<string[]>(value ? value.split('|').filter(Boolean) : []);
   const { toast } = useToast();
+  const storage = useStorage();
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -71,13 +75,13 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string>('');
+  const [pendingLink, setPendingLink] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const newValue = value ? value.split('|').filter(Boolean) : [];
-    if (JSON.stringify(newValue) !== JSON.stringify(items)) {
-      setItems(newValue);
-    }
-  }, [value, items]);
+    setItems(prev => JSON.stringify(newValue) === JSON.stringify(prev) ? prev : newValue);
+  }, [value]);
 
   useEffect(() => {
     const getDevices = async () => {
@@ -117,23 +121,28 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  const updateParent = (newItems: string[]) => {
-    setItems(newItems);
-    onChange(newItems.join('|'));
+  useEffect(() => {
+    return () => stopStream();
+  }, []);
+
+  const updateParent = (updater: string[] | ((prev: string[]) => string[])) => {
+    setItems(prev => {
+      const nextItems = typeof updater === 'function'
+        ? (updater as (prev: string[]) => string[])(prev)
+        : updater;
+      onChange(nextItems.join('|'));
+      return nextItems;
+    });
   };
 
   const addItem = (data: string, name?: string) => {
     const finalName = name || (data.startsWith('data:image') ? `Ảnh_${new Date().getTime()}` : (data.startsWith('data:video') ? `Video_${new Date().getTime()}` : `Tệp_${new Date().getTime()}`));
     const newItem = `${finalName}:::${data}`;
-    const newItems = [...items, newItem];
-    setItems(newItems);
-    onChange(newItems.join('|'));
+    updateParent(prev => [...prev, newItem]);
   };
 
   const removeItem = (index: number) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
-    onChange(newItems.join('|'));
+    updateParent(prev => prev.filter((_, i) => i !== index));
   };
 
   const parseItem = (item: string) => {
@@ -146,10 +155,7 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
 
   const updateItemName = (index: number, newName: string) => {
     const { data } = parseItem(items[index]);
-    const newItems = [...items];
-    newItems[index] = `${newName}:::${data}`;
-    setItems(newItems);
-    onChange(newItems.join('|'));
+    updateParent(prev => prev.map((item, itemIndex) => itemIndex === index ? `${newName.trim() || `Tep_${index + 1}`}:::${data}` : item));
     setEditingIndex(null);
   };
 
@@ -166,6 +172,72 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+  };
+
+  const sanitizeFileName = (fileName: string) => fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  const uploadBlobToStorage = async (blob: Blob, fileName: string) => {
+    const storageRef = ref(storage, `evidence/${Date.now()}_${sanitizeFileName(fileName)}`);
+    const snapshot = await uploadBytes(storageRef, blob, blob.type ? { contentType: blob.type } : undefined);
+    return getDownloadURL(snapshot.ref);
+  };
+
+  const uploadFiles = async (fileList: File[]) => {
+    if (fileList.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const uploadedItems: string[] = [];
+      for (const file of fileList) {
+        const url = await uploadBlobToStorage(file, file.name);
+        uploadedItems.push(`${file.name}:::${url}`);
+      }
+
+      updateParent(prev => [...prev, ...uploadedItems]);
+      toast({
+        title: 'Da tai tep len thanh cong',
+        description: `${fileList.length} tep dinh kem da san sang.`,
+      });
+    } catch (error: any) {
+      console.error('Error uploading evidence files:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Loi tai tep',
+        description: error?.message || 'Khong the tai tep len he thong.',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const normalizeLink = (rawValue: string) => {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return null;
+
+    try {
+      return new URL(trimmed).toString();
+    } catch {
+      try {
+        return new URL(`https://${trimmed}`).toString();
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  const handleAddLink = () => {
+    const normalized = normalizeLink(pendingLink);
+    if (!normalized) {
+      toast({
+        variant: 'destructive',
+        title: 'Lien ket khong hop le',
+        description: 'Hay nhap URL day du, vi du https://example.com.',
+      });
+      return;
+    }
+
+    addItem(normalized, normalized.replace(/^https?:\/\//, ''));
+    setPendingLink('');
   };
 
   const startMedia = async (forceSource?: SourceType, forceDeviceId?: string) => {
@@ -203,12 +275,19 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
     }
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current && canvasRef.current) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
+        
+        // Match mirroring of video preview
+        if (sourceType === 'camera' && isFrontCamera) {
+          context.translate(canvasRef.current.width, 0);
+          context.scale(-1, 1);
+        }
+        
         context.drawImage(videoRef.current, 0, 0);
         const dataUrl = canvasRef.current.toDataURL('image/png');
         addItem(dataUrl);
@@ -248,15 +327,11 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files);
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => addItem(reader.result as string, file.name);
-        reader.readAsDataURL(file);
-      });
+      await uploadFiles(Array.from(e.target.files));
     }
+    e.target.value = '';
   };
 
   const formatTime = (seconds: number) => {
@@ -266,10 +341,11 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
   };
 
   const getFileIcon = (item: string) => {
-    const { data } = parseItem(item);
-    if (data.startsWith('data:image')) return <LucideImage className="h-4 w-4 text-blue-500" />;
-    if (data.startsWith('data:video')) return <Video className="h-4 w-4 text-purple-500" />;
-    if (data.startsWith('data:application/pdf') || data.toLowerCase().endsWith('.pdf')) return <FileText className="h-4 w-4 text-red-500" />;
+    const { name, data } = parseItem(item);
+    const identifier = `${name} ${data}`.toLowerCase();
+    if (data.startsWith('data:image') || /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(identifier)) return <LucideImage className="h-4 w-4 text-blue-500" />;
+    if (data.startsWith('data:video') || /\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(identifier)) return <Video className="h-4 w-4 text-purple-500" />;
+    if (data.startsWith('data:application/pdf') || /\.(pdf|doc|docx|xls|xlsx|txt)(\?|$)/i.test(identifier)) return <FileText className="h-4 w-4 text-red-500" />;
     if (data.startsWith('http')) return <LinkIcon className="h-4 w-4 text-green-500" />;
     return <FileText className="h-4 w-4 text-gray-500" />;
   };
@@ -370,8 +446,8 @@ export function EvidenceInput({ value, onChange, onlyCamera }: EvidenceInputProp
 
         {!onlyCamera && (
           <TabsContent value="upload" className="space-y-2">
-            <div className="border-2 border-dashed rounded-md p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
-              <input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+            <div className={cn("border-2 border-dashed rounded-md p-8 text-center transition-colors relative", isUploading ? "cursor-not-allowed bg-muted/40" : "hover:bg-muted/50 cursor-pointer")}>
+              <input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" disabled={isUploading} />
               <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm font-medium">Kéo thả tệp hoặc nhấn để chọn</p>
             </div>

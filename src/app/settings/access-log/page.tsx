@@ -3,7 +3,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   History, Eye, FileDown, Cog, ChevronLeft, ChevronRight, 
   ChevronsLeft, ChevronsRight, ArrowUpDown, ArrowUp, 
@@ -181,7 +181,19 @@ export default function AccessLogPage() {
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user: authUser } = useUser();
-    const { employees, lecturers, students } = useMasterData();
+    const { 
+        employees, 
+        lecturers, 
+        students, 
+        employeesMap, 
+        lecturersMap, 
+        studentsMap,
+        requestPersonnelData
+    } = useMasterData();
+
+    useEffect(() => {
+        requestPersonnelData();
+    }, [requestPersonnelData]);
 
     const logsRef = useMemo(() => {
         if (!firestore) return null;
@@ -208,22 +220,12 @@ export default function AccessLogPage() {
                 formattedTime = String(log.timestamp);
             }
             
-            const userId = (log.userId || '').trim();
+            const userId = (log.userId || '').trim().toLowerCase();
             
-            // 1. Try to find in master data by ID, EmployeeID, or Email
-            const emp = employees.find(e => 
-                (e.id && e.id === userId) || 
-                (e.employeeId && e.employeeId === userId) || 
-                (e.email && userId && e.email.toLowerCase() === userId.toLowerCase())
-            );
-            const lec = lecturers.find(l => 
-                (l.id && l.id === userId) || 
-                (l.email && userId && l.email.toLowerCase() === userId.toLowerCase())
-            );
-            const stu = students.find(s => 
-                (s.id && s.id === userId) || 
-                (s.email && userId && s.email.toLowerCase() === userId.toLowerCase())
-            );
+            // 1. Try to find in master data by ID or Email using optimized maps
+            const emp = employeesMap.get(userId);
+            const lec = lecturersMap.get(userId);
+            const stu = studentsMap.get(userId);
             
             let personName = emp?.nickname || emp?.name || lec?.name || stu?.name || null;
             

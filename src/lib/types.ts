@@ -21,6 +21,7 @@ export type Student = {
   parentPhone?: string; // ĐT Phụ huynh
   phone: string; // Điện thoại
   email: string; // Email
+  identifier?: string; // Mã định danh (CCCD hoặc MSSV)
   note?: string; // Ghi chú
 };
 
@@ -85,6 +86,37 @@ export type Gift = {
   id: string;
   name: string;
   note: string;
+};
+
+export type DocumentType = {
+  id: string;
+  name: string;
+  note: string;
+};
+
+export type DocumentRecord = {
+  id: string;
+  docCode: string;
+  docNumber: string;
+  title: string;
+  abstract: string;
+  docType: string;
+  issueDate: string;
+  receivedDate: string;
+  issuingBody: string;
+  signer: string;
+  department: string;
+  assignee: string;
+  urgency: 'Thường' | 'Khẩn' | 'Hỏa tốc';
+  confidentiality: 'Thường' | 'Mật' | 'Tối mật';
+  status: 'Mới' | 'Chờ duyệt' | 'Đã duyệt' | 'Cần bổ sung' | 'Ban hành';
+  originalFile?: string;
+  extractedText?: string;
+  aiSummary?: string;
+  keywords?: string[];
+  filePassword?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type BuildingBlock = {

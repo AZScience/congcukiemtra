@@ -51,10 +51,10 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, sortConfig, openPopover, s
                     <span>{title}</span>
                     {sortState ? (
                         sortState.direction === 'asc' ?
-                            <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-yellow-300")} /> :
-                            <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-yellow-300")} />
+                            <ArrowUp className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} /> :
+                            <ArrowDown className={cn("ml-1 h-3 w-3 shrink-0", isFiltered && "text-red-500")} />
                     ) : (
-                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-yellow-300" : "hover:opacity-100")} />
+                        <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "hover:opacity-100")} />
                     )}
                 </div>
             </PopoverTrigger>
@@ -242,7 +242,7 @@ function ViolationDataTable({ data, emptyMessage, loading }: { data: StudentViol
                                     )}
                                 </TableHead>
                             ))}
-                            <TableHead className="w-16 text-center text-white p-0 border-l border-red-300 bg-[#dc2626]/95">
+                            <TableHead className="w-16 text-center text-white p-0 border-l border-red-300 bg-[#dc2626] sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-red-700/50 transition-colors">
@@ -308,7 +308,7 @@ function ViolationDataTable({ data, emptyMessage, loading }: { data: StudentViol
                                 )}
                                 {isVisible('officer') && <TableCell className="border-r border-red-50 p-2 font-medium">{item.officer}</TableCell>}
                                 {isVisible('note') && <TableCell className="p-2 text-xs text-gray-500 italic leading-snug">{item.note}</TableCell>}
-                                <TableCell className="p-2 text-center border-l bg-rose-50/10"></TableCell>
+                                <TableCell className="p-2 text-center border-l bg-rose-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -419,7 +419,7 @@ function DailyViolationDataTable({ data, loading, t }: { data: StudentViolation[
                                     />
                                 </TableHead>
                             ))}
-                            <TableHead className="w-16 text-center text-white p-0 border-l border-red-300 bg-[#dc2626]/95">
+                            <TableHead className="w-16 text-center text-white p-0 border-l border-red-300 bg-[#dc2626] sticky right-0 z-20 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:text-white hover:bg-red-700/50 transition-colors">
@@ -465,7 +465,7 @@ function DailyViolationDataTable({ data, loading, t }: { data: StudentViolation[
                                 )}
                                 {isVisible('officer') && <TableCell className="border-r border-rose-50 p-2 text-gray-700 font-medium text-xs">{item.officer}</TableCell>}
                                 {isVisible('note') && <TableCell className="p-2 text-[10px] text-gray-500 italic leading-snug">{item.note}</TableCell>}
-                                <TableCell className="p-2 text-center border-l bg-rose-50/10"></TableCell>
+                                <TableCell className="p-2 text-center border-l bg-rose-50/5 sticky right-0 z-10 shadow-[-2px_0_5px_rgba(0,0,0,0.05)]"></TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -505,7 +505,7 @@ export default function StudentViolationsReportPage() {
     const [selectedOfficers, setSelectedOfficers] = useState<string[]>([]);
     const [selectedViolationTypes, setSelectedViolationTypes] = useState<string[]>([]);
 
-    const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(true);
+    const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
 
     // Data Fetching
     const violationsRef = useMemo(() => (firestore ? collection(firestore, "student-violations") : null), [firestore]);

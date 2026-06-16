@@ -26,17 +26,30 @@ interface SystemParameters {
     aiModel: string;
     aiSystemPrompt: string;
     aiTemperature: number;
+    loginImageUrl: string;
+    loginQuote: string;
+    loginQuoteAuthor: string;
+    feedbackSheetId: string;
+    feedbackTabName: string;
+    evidenceServiceAccountEmail: string;
+    evidencePrivateKey: string;
+    evidenceGoogleDriveFolderId?: string;
 }
 
 const DEFAULT_PARAMS: SystemParameters = {
     bannerUrl: "https://kiemtranoibo.ntt.edu.vn/wp-content/uploads/2025/09/PHONG-KIEM-TRA-NOI-BO.png",
     bannerHeight: 40,
     googleSheetId: "",
-    googleServiceAccountEmail: "",
-    googlePrivateKey: "",
+    googleServiceAccountEmail: "firebase-adminsdk-fbsvc@congcukiemtra-noibo.iam.gserviceaccount.com",
+    googlePrivateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC9Xzf+QR3ulRke\n6oWY1+59x/GKqNM/hQ0RN4L0YXlzMAhVJPrP90l5ZHSdx6bwxV8sGeQ9A16faifH\nYk4T/noHCFaI+2nKjGDJMYPV4sskUd9wKmtNT7YJrPGikmiCNwAbXk5kjplTKuEN\nfYvePl6HjxSdtzcz9iBUVpobqRoDpQYxhfHxBTVFP/yszXChEeIMTrgXw9UVN9w6\n8EbHErdTjn2ybZm0s9CG/4BvvNeHIJqMfOwpJFtkWBbjrGtCpq2ZY2q8uT35ajaO\n/yJyyYkdOChR78GEIL4w5+/J9oN34ift9F0iKc1vFOCXoFHRxMJObCQcCUcBx4s7\nl+cvISp1AgMBAAECggEAC6buupHGJjZ9X7Ydd0yeC5ZAagA+U1O7/Jm2UJQo1WoY\nsSh/2EkGd9YzCLxOrNTwKLYFIa3x5gwxm2aUmE1Zs9ITBQW3OjPOBsMpsgDs7/Sr\ns2qgxJaJhGnkSlUI4i5BLu3sE+rkS0ZBp8NYVlnvFhc7NQMffe6Aib/0ZoxOofer\nzG+rmWTC5kFzd4e+x0/dabelEmWN/2KzZMlj92JSTJewo/v5HpTYFTVqmylqaWFV\n81C8PY2TeipvQdji+t2ouaeGbdk6PIwpOEt0ELMpFTqMpBY0SNf7NRpkPf36blR2\nJstgtgVYpWg/aWKIvAt77kjiauG5S4fhl3Fwq4lM5wKBgQDvCGtFGpGYwgz49FY7\nJi4S5imsFIjy11Ds3pdf6KIcOp8MjRlnelR77aNtFxtduwgMzsJoW2nliOVOBagh\nms54g7TKjxTUX46U6IZXMPozKbAPx5HZ3xdfrT1hE7NU6WsEWQee8aw8PvXAkVGR\\nA2saPI54hLytWoKUTQrymwCqowKBgQDK0GMTnVMe4E7u9mGKi5O9x+YVgDjsJi2b\nXze/PMJUgik6wrLwlPd1vAWnUqlwOV5FIyod1Gfls3V807kiJwa8ST9E5WMlNgkZ\n1CNCBrk5rRZnaTTGeJzO2CAr+D2BQcBmovPysoCisYp05QN8LLShg4vLaVPjwUlm\nlHbrT7mABwKBgQCBgwlEDuo2X2XR+elC8SPjn4uSrimpkhpJzS0tjQlQzD5i+Yx7\nMZ/W6eIzeGKefXkWH2zcSDNvZ6X+iTgYxRz71Ti+y5mYnBHQAtDPKz1VPVAkrJgM\n+UBb2ay5DYiMCFCwsWBcsUsF9YMIDHSqYrTEKW10RU9JihHYMoos+uj4iwKBgBzu\nj0OsDMB51SjHovCFqsTG8G6exQADDjx839H7E+nES6djQO2LAqYb9V6CL0OgG2+X\nbZmlxFCDQj5VYbKaiJ5xgIIOiw8y3yd9GK6BkQjGRUzpOCsb55qmQCill/iJba32\njwBPMISE+TBlvxKGuhnUTyvsUZhK6XKluTUmQVsfAoGBAOuxJ/Vsv1fwFQStbxNT\nNBhwx/wnl8APUlJ3Vom9naRPOSXWG8x3WPePpxrIDBsjV9+9s3EU5mpmfjlUecaY\nkMBAbxzqWxH265zgaT7520iPZa9hSWgCfzfFX2WPZCkNZCXjwXAdhu0Q8tbJq8Z8\nCBedleHbRgODYGjVzEYnBI/F\n-----END PRIVATE KEY-----\n",
     googleDriveFolderId: "",
     faqSheetTabName: "Hỏi đáp",
     reportSheetTabName: "Báo cáo Tổng hợp",
+    feedbackSheetId: "",
+    feedbackTabName: "Trang tính1",
+    evidenceServiceAccountEmail: "firebase-adminsdk-fbsvc@congcukiemtra-noibo.iam.gserviceaccount.com",
+    evidencePrivateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC9Xzf+QR3ulRke\n6oWY1+59x/GKqNM/hQ0RN4L0YXlzMAhVJPrP90l5ZHSdx6bwxV8sGeQ9A16faifH\nYk4T/noHCFaI+2nKjGDJMYPV4sskUd9wKmtNT7YJrPGikmiCNwAbXk5kjplTKuEN\nfYvePl6HjxSdtzcz9iBUVpobqRoDpQYxhfHxBTVFP/yszXChEeIMTrgXw9UVN9w6\n8EbHErdTjn2ybZm0s9CG/4BvvNeHIJqMfOwpJFtkWBbjrGtCpq2ZY2q8uT35ajaO\n/yJyyYkdOChR78GEIL4w5+/J9oN34ift9F0iKc1vFOCXoFHRxMJObCQcCUcBx4s7\nl+cvISp1AgMBAAECggEAC6buupHGJjZ9X7Ydd0yeC5ZAagA+U1O7/Jm2UJQo1WoY\nsSh/2EkGd9YzCLxOrNTwKLYFIa3x5gwxm2aUmE1Zs9ITBQW3OjPOBsMpsgDs7/Sr\ns2qgxJaJhGnkSlUI4i5BLu3sE+rkS0ZBp8NYVlnvFhc7NQMffe6Aib/0ZoxOofer\nzG+rmWTC5kFzd4e+x0/dabelEmWN/2KzZMlj92JSTJewo/v5HpTYFTVqmylqaWFV\n81C8PY2TeipvQdji+t2ouaeGbdk6PIwpOEt0ELMpFTqMpBY0SNf7NRpkPf36blR2\nJstgtgVYpWg/aWKIvAt77kjiauG5S4fhl3Fwq4lM5wKBgQDvCGtFGpGYwgz49FY7\nJi4S5imsFIjy11Ds3pdf6KIcOp8MjRlnelR77aNtFxtduwgMzsJoW2nliOVOBagh\nms54g7TKjxTUX46U6IZXMPozKbAPx5HZ3xdfrT1hE7NU6WsEWQee8aw8PvXAkVGR\nA2saPI54hLytWoKUTQrymwCqowKBgQDK0GMTnVMe4E7u9mGKi5O9x+YVgDjsJi2b\nXze/PMJUgik6wrLwlPd1vAWnUqlwOV5FIyod1Gfls3V807kiJwa8ST9E5WMlNgkZ\n1CNCBrk5rRZnaTTGeJzO2CAr+D2BQcBmovPysoCisYp05QN8LLShg4vLaVPjwUlm\nlHbrT7mABwKBgQCBgwlEDuo2X2XR+elC8SPjn4uSrimpkhpJzS0tjQlQzD5i+Yx7\nMZ/W6eIzeGKefXkWH2zcSDNvZ6X+iTgYxRz71Ti+y5mYnBHQAtDPKz1VPVAkrJgM\n+UBb2ay5DYiMCFCwsWBcsUsF9YMIDHSqYrTEKW10RU9JihHYMoos+uj4iwKBgBzu\nj0OsDMB51SjHovCFqsTG8G6exQADDjx839H7E+nES6djQO2LAqYb9V6CL0OgG2+X\nbZmlxFCDQj5VYbKaiJ5xgIIOiw8y3yd9GK6BkQjGRUzpOCsb55qmQCill/iJba32\njwBPMISE+TBlvxKGuhnUTyvsUZhK6XKluTUmQVsfAoGBAOuxJ/Vsv1fwFQStbxNT\nNBhwx/wnl8APUlJ3Vom9naRPOSXWG8x3WPePpxrIDBsjV9+9s3EU5mpmfjlUecaY\nkMBAbxzqWxH265zgaT7520iPZa9hSWgCfzfFX2WPZCkNZCXjwXAdhu0Q8tbJq8Z8\nCBedleHbRgODYGjVzEYnBI/F\n-----END PRIVATE KEY-----\n",
+    evidenceGoogleDriveFolderId: "",
     adminEmail: "vinhphuc@ntt.edu.vn",
     supportPhone: "0987654321",
     website: "https://kiemtranoibo.ntt.edu.vn",
@@ -49,7 +62,10 @@ const DEFAULT_PARAMS: SystemParameters = {
     aiApiKey: "",
     aiModel: "gemini-1.5-pro",
     aiSystemPrompt: "Bạn là một trợ lý AI chuyên nghiệp hỗ trợ công tác kiểm tra nội bộ tại trường Đại học Nguyễn Tất Thành. Hãy trả lời ngắn gọn, chính xác và chuyên nghiệp.",
-    aiTemperature: 0.7
+    aiTemperature: 0.7,
+    loginImageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmd8ZW58MHx8fHwxNzIxOTU4OTg5fDA&ixlib=rb-4.0.3&q=80&w=1080",
+    loginQuote: "Công nghệ chỉ là một công cụ. Về mặt khích lệ bọn trẻ làm việc cùng nhau và động viên chúng, giáo viên là người quan trọng nhất.",
+    loginQuoteAuthor: "Bill Gates"
 };
 
 interface SystemParametersContextType {
@@ -63,12 +79,17 @@ const SystemParametersContext = createContext<SystemParametersContextType | unde
 export function SystemParametersProvider({ children }: { children: React.ReactNode }) {
     const firestore = useFirestore();
     const [params, setParams] = useState<SystemParameters>(() => {
-        // Initial load from localStorage for fast initial render
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem('system_parameters');
             if (cached) {
                 try {
-                    return { ...DEFAULT_PARAMS, ...JSON.parse(cached) };
+                    const parsed = JSON.parse(cached);
+                    // Force clear if it contains the old project email
+                    if (parsed.googleServiceAccountEmail?.includes('kiemtranoibo-ccks')) {
+                        localStorage.removeItem('system_parameters');
+                        return DEFAULT_PARAMS;
+                    }
+                    return { ...DEFAULT_PARAMS, ...parsed };
                 } catch (e) {
                     return DEFAULT_PARAMS;
                 }

@@ -18,7 +18,7 @@ import {
   ArrowDown, Filter, X, EllipsisVertical, Save, Undo2, 
   BookUser, Ban, FileDown, FileUp, CheckCircle2, Eye, UserCircle2, 
   ListFilter, CalendarDays, IdCard, User, Sparkles, Briefcase, 
-  Shield, Mail, Phone, MapPin, StickyNote, Landmark, CloudUpload, CloudDownload, Check
+  Shield, Mail, Phone, MapPin, StickyNote, Landmark, CloudUpload, CloudDownload, Check, History, ChevronDown
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -52,7 +52,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Lecturer, Department } from '@/lib/types';
+import { DataTableEmptyState } from "@/components/data-table-empty-state";
 
 type DialogMode = 'add' | 'edit' | 'copy' | 'view';
 interface RenderLecturer extends Lecturer { renderId: string; }
@@ -67,7 +69,8 @@ const ColumnHeader = ({ columnKey, title, icon: Icon, t, sortConfig, openPopover
                     {Icon && <Icon className="mr-1.5 h-3.5 w-3.5 shrink-0 opacity-80" />}
                     <span className="truncate">{t(title)}</span>
                     {sortState ? (
-                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-300")} />) : <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-300" : "group-hover:opacity-100")} />}
+                        sortState.direction === 'ascending' ? <ArrowUp className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} /> : <ArrowDown className={cn("ml-1 h-3 w-3", isFiltered && "text-red-500")} />) : <ArrowUpDown className={cn("ml-1 h-3 w-3 opacity-30", isFiltered ? "text-red-500" : "group-hover:opacity-100")} />}
+
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-60 p-0" align="start">
@@ -201,136 +204,95 @@ const AdvancedFilterDialog = ({ open, onOpenChange, filters, setFilters, t, allD
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-4xl">
-                <DialogHeader className="border-b pb-4">
-                    <div className="flex items-center justify-between pr-8">
-                        <DialogTitle className="flex items-center gap-2">
-                            <ListFilter className="h-5 w-5 text-primary" />
-                            Bộ lọc nâng cao
-                        </DialogTitle>
-                        <div className="flex gap-2">
-                            {isNamingPreset ? (
-                                <div className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="Tên bộ lọc..." 
-                                        className="h-8 w-40 text-xs" 
-                                        value={newPresetName} 
-                                        onChange={e => setNewPresetName(e.target.value)} 
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                    />
-                                    <Button 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => {
-                                            if (newPresetName.trim()) {
-                                                onSaveCloud(newPresetName.trim());
-                                                setNewPresetName('');
-                                                setIsNamingPreset(false);
-                                            }
-                                        }}
-                                        disabled={isSaving}
-                                    >
-                                        <Check className="h-3 w-3 mr-1" /> Lưu
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-8 px-2" 
-                                        onClick={() => setIsNamingPreset(false)}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
+            <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                <div className="flex items-center justify-between border-b pl-4 pr-12 py-3 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                        <ListFilter className="h-5 w-5 text-primary" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <div className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity group">
+                                    <DialogTitle className="text-lg font-bold">Bộ lọc nâng cao</DialogTitle>
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
-                            ) : (
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="h-8 text-[10px] font-bold border-green-200 text-green-700 hover:bg-green-50"
-                                    onClick={() => setIsNamingPreset(true)}
-                                >
-                                    <CloudUpload className="mr-1 h-3 w-3" /> Lưu bộ lọc mới
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                    <VisuallyHidden><DialogDescription>Lọc danh sách giảng viên</DialogDescription></VisuallyHidden>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-                    {/* Presets Sidebar */}
-                    <div className="border-r pr-2 py-4 hidden md:block overflow-y-auto max-h-[70vh]">
-                        <div className="px-3 mb-2 flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Bộ lọc đã lưu</span>
-                            <span className="bg-primary/10 text-primary px-1.5 rounded-full">{presets?.length || 0}</span>
-                        </div>
-                        <div className="space-y-1 px-1">
-                            {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
-                                <div key={idx} className="group flex items-center gap-1 rounded-md hover:bg-muted p-1 transition-colors">
-                                    <Button 
-                                        variant="ghost" 
-                                        className="flex-1 justify-start h-8 text-xs font-medium px-2 py-1 text-left truncate overflow-hidden"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10"
-                                        onClick={() => onDeleteCloud(preset.name)}
-                                    >
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            )) : (
-                                <p className="text-[10px] text-muted-foreground px-3 py-4 text-center italic">Chưa có bộ lọc nào.</p>
-                            )}
-                        </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-64">
+                                <DropdownMenuLabel className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <History className="h-3.5 w-3.5" /> Bộ lọc đã lưu
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {presets?.length > 0 ? presets.map((preset: any, idx: number) => (
+                                        <div key={idx} className="flex items-center group/item px-1">
+                                            <DropdownMenuItem className="flex-1 cursor-pointer" onSelect={() => setFilters(preset.filters)}>
+                                                <span className="truncate">{preset.name}</span>
+                                            </DropdownMenuItem>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100 text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); onDeleteCloud(preset.name); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    )) : (
+                                        <div className="px-2 py-4 text-center italic text-[10px] text-muted-foreground">Chưa có bộ lọc nào</div>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
-                    <ScrollArea className="max-h-[70vh] col-span-2">
-                        {/* Mobile Presets (Horizontal) */}
-                        <div className="md:hidden p-4 border-b">
-                            <Label className="text-[10px] font-bold text-muted-foreground uppercase mb-2 block">Bộ lọc đã lưu</Label>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {presets?.map((preset: any, idx: number) => (
-                                    <Badge 
-                                        key={idx} 
-                                        variant="secondary" 
-                                        className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1.5"
-                                        onClick={() => setFilters(preset.filters)}
-                                    >
-                                        {preset.name}
-                                    </Badge>
-                                ))}
+                    <div className="flex items-center gap-2">
+                        {isNamingPreset ? (
+                            <div className="flex items-center gap-1">
+                                <Input placeholder="Tên bộ lọc..." className="h-8 w-32 text-xs" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} />
+                                <Button size="sm" className="h-8 px-2" onClick={() => { if (newPresetName.trim()) { onSaveCloud(newPresetName.trim()); setNewPresetName(''); setIsNamingPreset(false); } }} disabled={isSaving}><Check className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setIsNamingPreset(false)}><X className="h-3 w-3" /></Button>
                             </div>
-                        </div>
+                        ) : (
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold text-primary hover:bg-primary/10" onClick={() => setIsNamingPreset(true)}>
+                                <CloudUpload className="mr-1.5 h-3.5 w-3.5" /> Lưu hiện tại
+                            </Button>
+                        )}
+                    </div>
+                </div>
 
-                        <div className="grid gap-4 p-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Họ và tên</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
-                                <div className="space-y-2"><Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã GV</Label><Input value={filters.id || ''} onChange={e => setFilters({...filters, id: e.target.value})} placeholder="Nhập mã..." /></div>
-                            </div>
+                <VisuallyHidden><DialogDescription>Cấu hình bộ lọc nâng cao.</DialogDescription></VisuallyHidden>
+
+                <ScrollArea className="max-h-[70vh]">
+                    <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2"><Label className="flex items-center gap-2"><User className="h-4 w-4 text-primary" /> Họ và tên</Label><Input value={filters.name || ''} onChange={e => setFilters({...filters, name: e.target.value})} placeholder="Nhập tên..." /></div>
+                            <div className="space-y-2"><Label className="flex items-center gap-2"><IdCard className="h-4 w-4 text-primary" /> Mã GV</Label><Input value={filters.id || ''} onChange={e => setFilters({...filters, id: e.target.value})} placeholder="Nhập mã..." /></div>
                             <div className="space-y-2"><Label>{t('Ngày sinh')}</Label><DatePickerField value={filters.birthDate || ''} onChange={val => setFilters({...filters, birthDate: val || ''})} className="h-9" /></div>
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Đơn vị</Label>
                                 <Select value={filters.department || 'all'} onValueChange={v => setFilters({...filters, department: v === 'all' ? '' : v})}>
                                     <SelectTrigger><SelectValue placeholder="Tất cả" /></SelectTrigger>
-                                    <SelectContent><SelectItem value="all">Tất cả</SelectItem>{allDepts?.map((d:any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tất cả</SelectItem>
+                                        {allDepts?.map((d:any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Loại giảng viên</Label>
+                                <Select value={filters.type || 'all'} onValueChange={v => setFilters({...filters, type: v})}>
+                                    <SelectTrigger><SelectValue placeholder="Tất cả" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Tất cả</SelectItem>
+                                        <SelectItem value="Hợp đồng">Hợp đồng</SelectItem>
+                                        <SelectItem value="Thỉnh giảng">Thỉnh giảng</SelectItem>
+                                    </SelectContent>
                                 </Select>
                             </div>
                         </div>
-                    </ScrollArea>
-                </div>
-                <DialogFooter className="p-4 border-t">
-                    <Button variant="outline" onClick={() => setFilters({})}>Xóa tất cả</Button>
-                    <Button onClick={() => onOpenChange(false)}><CheckCircle2 className="mr-2 h-4 w-4" /> Áp dụng</Button>
+                    </div>
+                </ScrollArea>
+
+                <DialogFooter className="p-4 border-t bg-muted/20 flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <X className="mr-2 h-4 w-4" /> {t('Xóa tất cả')}
+                    </Button>
+                    <Button onClick={() => onOpenChange(false)} className="bg-primary text-primary-foreground shadow-sm">
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> {t('Áp dụng bộ lọc')}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -341,11 +303,15 @@ export default function LecturersPage() {
   const { t } = useLanguage();
   const firestore = useFirestore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const collectionRef = useMemo(() => (firestore ? collection(firestore, 'lecturers') : null), [firestore]);
+  const { data: rawLecturers, loading: lecturersLoading } = useCollection<Lecturer>(collectionRef);
   const { 
-    lecturers: rawLecturers, 
     departments: allDepartments, 
-    loading 
+    loading: masterLoading 
   } = useMasterData();
+  const { permissions, isLoading: permsLoading } = usePermissions('/personnel/lecturers');
+  const loading = permsLoading || lecturersLoading || masterLoading;
+  const error: any = null;
   const deptMap = useMemo(() => new Map((allDepartments || []).map(d => [d.id, d.name])), [allDepartments]);
   const data = useMemo(() => (rawLecturers || []).map((item, idx) => ({ ...item, renderId: `${item.id}-${idx}` })) as RenderLecturer[], [rawLecturers]);
 
@@ -542,9 +508,18 @@ export default function LecturersPage() {
                 <div className="flex items-center gap-2">
                   <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
                   <Tooltip><TooltipTrigger asChild><Button onClick={() => setIsAdvancedFilterOpen(true)} variant="ghost" size="icon" className="text-orange-500"><ListFilter className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Bộ lọc nâng cao')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
-                  <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                  
+                  {permissions.import && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => fileInputRef.current?.click()} variant="ghost" size="icon" className="text-blue-600"><FileUp className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Nhập file Excel')}</p></TooltipContent></Tooltip>
+                  )}
+                  
+                  {permissions.export && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={handleExport} variant="ghost" size="icon" className="text-green-600"><FileDown className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Xuất file Excel')}</p></TooltipContent></Tooltip>
+                  )}
+                  
+                  {permissions.add && (
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => openDialog('add')} variant="ghost" size="icon" className="text-primary"><PlusCircle className="h-5 w-5" /></Button></TooltipTrigger><TooltipContent><p>{t('Thêm mới')}</p></TooltipContent></Tooltip>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -561,25 +536,52 @@ export default function LecturersPage() {
                           )}
                         </TableHead>
                       ))}
-                      <TableHead className="w-16 text-center text-white font-bold text-base">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:text-white hover:bg-blue-700"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-                                <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [k]: !!v}))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TooltipTrigger>
-                          <TooltipContent><p>{t('Cài đặt hiển thị')}</p></TooltipContent>
-                        </Tooltip>
+                      <TableHead className="w-16 sticky right-0 z-20 bg-[#1877F2] shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-l border-blue-300 p-0 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-white hover:bg-white/20 rounded-none transition-colors"><Cog className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                            <DropdownMenuLabel>{t('Hiển thị cột')}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {allColumns.map(k => <DropdownMenuCheckboxItem key={k} checked={columnVisibility[k]} onCheckedChange={(v) => setColumnVisibility(p => ({...p, [k]: !!v}))}>{t(columnDefs[k])}</DropdownMenuCheckboxItem>)}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loading ? <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Đang tải...')}</TableCell></TableRow> : currentItems.length > 0 ? currentItems.map((item, idx) => {
+                    {loading ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                  <Cog className="h-8 w-8 animate-spin text-primary opacity-50" />
+                                  <p className="text-muted-foreground animate-pulse">{t('Đang tải dữ liệu...')}</p>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : error ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2 text-destructive">
+                                  <Ban className="h-8 w-8 opacity-50" />
+                                  <p className="font-bold">{t('Lỗi truy cập dữ liệu')}</p>
+                                  <p className="text-xs opacity-70">{error.message}</p>
+                                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2">
+                                      <Undo2 className="mr-2 h-4 w-4" /> {t('Thử lại')}
+                                  </Button>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : !permissions.view ? (
+                      <TableRow>
+                          <TableCell colSpan={orderedColumns.length + 2} className="text-center h-40">
+                              <div className="flex flex-col items-center justify-center gap-2 text-orange-500">
+                                  <Ban className="h-8 w-8 opacity-50" />
+                                  <p className="font-bold">{t('Hạn chế quyền truy cập')}</p>
+                                  <p className="text-sm opacity-70">{t('Bạn không có quyền xem dữ liệu trong danh mục này.')}</p>
+                              </div>
+                          </TableCell>
+                      </TableRow>
+                    ) : currentItems.length > 0 ? currentItems.map((item, idx) => {
                       const isSelected = selectedSet.has(item.renderId);
                       return (
                         <TableRow key={item.renderId} onClick={() => handleRowClick(item.renderId)} data-state={isSelected ? "selected" : ""} className={cn("cursor-pointer odd:bg-white even:bg-muted/20 hover:bg-yellow-300 transition-all", "data-[state=selected]:bg-red-800 data-[state=selected]:text-white")}>
@@ -596,19 +598,46 @@ export default function LecturersPage() {
                                k === 'department' ? (deptMap.get(item.department || '') || item.department || '') : String(item[k as keyof Lecturer] || '')}
                             </TableCell>
                           ))}
-                          <TableCell className="text-center py-3 text-inherit align-middle">
+                          <TableCell className="sticky right-0 z-20 bg-inherit shadow-[-2px_0_5px_rgba(0,0,0,0.05)] border-l text-center py-3 text-inherit align-middle">
                             <div onClick={e => e.stopPropagation()}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem><DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4"/>Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                </TooltipTrigger>
-                                <TooltipContent><p>{t('Thao tác')}</p></TooltipContent>
-                              </Tooltip>
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-primary"><EllipsisVertical className="h-5 w-5"/></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onSelect={()=>openDialog('view', item)}><Eye className="mr-2 h-4 w-4"/>Chi tiết</DropdownMenuItem>
+                                  
+                                  {permissions.edit && (
+                                    <>
+                                      <DropdownMenuItem onSelect={()=>openDialog('edit', item)}><Edit className="mr-2 h-4 w-4"/>Sửa</DropdownMenuItem>
+                                      <DropdownMenuItem onSelect={()=>openDialog('copy', item)}><Copy className="mr-2 h-4 w-4"/>Sao chép</DropdownMenuItem>
+                                    </>
+                                  )}
+                                  
+                                  {permissions.delete && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={()=>{ setSelectedItem(item); setIsDeleteDialogOpen(true); }}>
+                                        <Trash2 className="mr-2 h-4 w-4"/>Xóa
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </TableRow>
                       );
-                    }) : <TableRow><TableCell colSpan={orderedColumns.length + 2} className="text-center h-24">{t('Không có dữ liệu.')}</TableCell></TableRow>}
+                    }) : (
+                        <DataTableEmptyState 
+                            colSpan={orderedColumns.length + 2} 
+                            icon={BookUser}
+                            title={t('Không tìm thấy giảng viên')}
+                            filters={filters}
+                            onClearFilters={() => {
+                                setFilters({});
+                                setCurrentPage(1);
+                            }}
+                        />
+                    )}
                   </TableBody>
                 </Table>
               </div>

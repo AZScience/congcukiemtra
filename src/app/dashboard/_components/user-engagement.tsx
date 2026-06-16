@@ -15,7 +15,7 @@ export default function UserEngagement() {
     const stats = useVisitStats();
 
     return (
-        <Card>
+        <Card className="overflow-hidden">
             <CardHeader>
                 <CardTitle>{t('Thống kê truy cập')}</CardTitle>
                 <CardDescription>{t('Thống kê số lượng truy cập và người dùng trực tuyến.')}</CardDescription>

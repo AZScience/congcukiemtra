@@ -4,12 +4,8 @@ import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, Timestamp, doc, setDoc } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 
-const getDb = async () => {
-    const apps = getApps();
-    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    return db;
-};
+import { db } from '@/lib/firebase';
+const getDb = async () => db;
 
 export async function OPTIONS() {
     return new Response(null, {
@@ -64,11 +60,15 @@ export async function GET(request: Request) {
                 const query = String(rawClass || "").trim().toUpperCase();
                 if (!query) return true;
 
-                // 3. Kiểm tra mã lớp hoặc tên môn học - So sánh chuỗi an toàn
+                // 3. Kiểm tra mã lớp, tên môn học hoặc link cuộc họp - So sánh chuỗi an toàn
                 const itemClass = String(item.Class || item.class || "").toUpperCase();
                 const itemCourse = String(item.Course || item.course || item.content || "").toUpperCase();
+                const itemLink = String(item.meetingLink || item.MeetingLink || "").toLowerCase();
+                const queryLower = query.toLowerCase();
                 
-                return itemClass.includes(query) || itemCourse.includes(query);
+                return itemClass.includes(query) || 
+                       itemCourse.includes(query) || 
+                       (itemLink && itemLink.includes(queryLower));
             } catch (e) {
                 return false;
             }
